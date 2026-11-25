@@ -2,7 +2,7 @@
 
 Single-turn and agentic coding reinforcement learning built on NeMo RL and an external Gym service.
 
-![Training architecture](docs/architecture.svg)
+![Training architecture](docs/architecture-flow.svg)
 
 ## Rollout modes
 
@@ -19,15 +19,15 @@ The same-prompt mixture keeps prompt identities and route assignments consistent
 
 ### Single-turn
 
-![Single-turn generation and verification](docs/single-turn.svg)
+![Single-turn generation and verification](docs/single-turn-flow.svg)
 
 ### Multi-turn
 
-![Agentic rollout and training contract](docs/multi-turn.svg)
+![Agentic rollout and training contract](docs/multi-turn-flow.svg)
 
 ### Mixed rollout
 
-![Prompt-group and same-prompt sibling routing](docs/mixed.svg)
+![Prompt-group and same-prompt sibling routing](docs/mixed-flow.svg)
 
 These diagrams describe the integration contracts, not a claim of public-stack GPU validation. See [runtime compatibility](docs/runtime-compatibility.md). Regenerate them with `python scripts/build_readme_diagrams.py`.
 

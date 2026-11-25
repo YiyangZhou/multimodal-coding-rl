@@ -24,7 +24,7 @@ class Diagram:
         if detail:self.text(x+18,y+81,detail,13)
     def note(self,t):self.text(40,self.h-22,t,13)
     def save(self):
-        self.s.append('</g></svg>'); OUT.mkdir(exist_ok=True); (OUT/(self.name+'.svg')).write_text('\n'.join(self.s)+'\n')
+        self.s.append('</g></svg>'); OUT.mkdir(exist_ok=True); (OUT/(self.name+'-flow.svg')).write_text('\n'.join(self.s)+'\n')
 
 d=Diagram('architecture','One policy. Multiple ways to solve.','Multimodal tasks → direct or agentic rollouts → verified rewards → NeMo RL updates.',600)
 # Edges are laid out first, keeping the policy feedback separate from artifact flow.

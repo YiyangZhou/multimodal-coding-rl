@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="600" viewBox="0 0 1440 600" role="img" aria-labelledby="title desc">
+<title id="title">One policy. Multiple ways to solve.</title><desc id="desc">Multimodal tasks → direct or agentic rollouts → verified rewards → NeMo RL updates.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#a3b2bb" stroke-width="1.5"/></marker></defs>
+<rect width="1440" height="600" rx="22" fill="#f7f8fa"/>
+<g font-family="Arial,Helvetica,sans-serif">
+<text x="40" y="45" font-size="25" fill="#1b2730" font-weight="600" text-anchor="start">One policy. Multiple ways to solve.</text>
+<text x="40" y="76" font-size="15" fill="#687882" font-weight="400" text-anchor="start">Multimodal tasks → direct or agentic rollouts → verified rewards → NeMo RL updates.</text>
+<path d="M240 252 H280 V162 H320" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M280 252 V324 H320" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M550 162 H590 V252 H650" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M550 324 H590 V252" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round"/>
+<path d="M880 252 H930" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1150 252 H1200" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M435 376 V406" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M320 450 H295 V350 H320" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1300 304 V532 H268 V124 H320" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+<path d="M268 324 H320" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+<rect x="40" y="200" width="200" height="104" rx="14" fill="#ffffff" stroke="#dce3e9"/>
+<text x="58" y="227" font-size="11" fill="#687882" font-weight="600" text-anchor="start">INPUT ADAPTERS</text>
+<text x="58" y="256" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Task + references</text>
+<text x="58" y="281" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Images · text · code</text>
+<rect x="320" y="110" width="230" height="104" rx="14" fill="#eaf6f7" stroke="#dce3e9"/>
+<text x="338" y="137" font-size="11" fill="#087f91" font-weight="600" text-anchor="start">SINGLE-TURN</text>
+<text x="338" y="166" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Direct generation</text>
+<text x="338" y="191" font-size="13" fill="#687882" font-weight="400" text-anchor="start">One model answer</text>
+<rect x="320" y="272" width="230" height="104" rx="14" fill="#f0edfb" stroke="#dce3e9"/>
+<text x="338" y="299" font-size="11" fill="#7160bc" font-weight="600" text-anchor="start">MULTI-TURN</text>
+<text x="338" y="328" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Agent harness</text>
+<text x="338" y="353" font-size="13" fill="#687882" font-weight="400" text-anchor="start">OpenCode · Codex · Hermes</text>
+<rect x="320" y="406" width="230" height="104" rx="14" fill="#ffffff" stroke="#dce3e9"/>
+<text x="338" y="433" font-size="11" fill="#687882" font-weight="600" text-anchor="start">REMOTE SANDBOX</text>
+<text x="338" y="462" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Tools + observations</text>
+<text x="338" y="487" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Execute · render · inspect</text>
+<rect x="650" y="200" width="230" height="104" rx="14" fill="#eaf6f7" stroke="#dce3e9"/>
+<text x="668" y="227" font-size="11" fill="#087f91" font-weight="600" text-anchor="start">ROLLOUT CONTRACT</text>
+<text x="668" y="256" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Trajectory capture</text>
+<text x="668" y="281" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Tokens · logprobs · lineage</text>
+<rect x="930" y="200" width="220" height="104" rx="14" fill="#ffffff" stroke="#dce3e9"/>
+<text x="948" y="227" font-size="11" fill="#687882" font-weight="600" text-anchor="start">TASK VERIFIER</text>
+<text x="948" y="256" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Execute + score</text>
+<text x="948" y="281" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Final artifact → reward</text>
+<rect x="1200" y="200" width="200" height="104" rx="14" fill="#f0edfb" stroke="#dce3e9"/>
+<text x="1218" y="227" font-size="11" fill="#7160bc" font-weight="600" text-anchor="start">NEMO RL</text>
+<text x="1218" y="256" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Grouped update</text>
+<text x="1218" y="281" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Advantages → policy</text>
+<text x="760" y="342" font-size="14" fill="#087f91" font-weight="500" text-anchor="start">Complete prompt groups</text>
+<text x="760" y="366" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Validity masks + length rules</text>
+<text x="735" y="521" font-size="13" fill="#7160bc" font-weight="400" text-anchor="start">Versioned policy sync → generation workers</text>
+<text x="40" y="578" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Private judge references stay outside model prompts. The Gym service and sandbox runtime are external dependencies.</text>
+</g></svg>

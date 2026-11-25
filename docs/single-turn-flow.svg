@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="500" viewBox="0 0 1440 500" role="img" aria-labelledby="title desc">
+<title id="title">01 / Single-turn</title><desc id="desc">A direct answer becomes an executable artifact; verification supplies the training reward.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#a3b2bb" stroke-width="1.5"/></marker></defs>
+<rect width="1440" height="500" rx="22" fill="#f7f8fa"/>
+<g font-family="Arial,Helvetica,sans-serif">
+<text x="40" y="45" font-size="25" fill="#1b2730" font-weight="600" text-anchor="start">01 / Single-turn</text>
+<text x="40" y="76" font-size="15" fill="#687882" font-weight="400" text-anchor="start">A direct answer becomes an executable artifact; verification supplies the training reward.</text>
+<path d="M240 234 H290" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M500 234 H550" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M760 234 H810" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1030 234 H1080" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1240 286 V402 H395 V286" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+<rect x="40" y="182" width="200" height="104" rx="14" fill="#ffffff" stroke="#dce3e9"/>
+<text x="58" y="209" font-size="11" fill="#687882" font-weight="600" text-anchor="start">INPUT</text>
+<text x="58" y="238" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Task prompt</text>
+<text x="58" y="263" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Allowed references</text>
+<rect x="290" y="182" width="210" height="104" rx="14" fill="#eaf6f7" stroke="#dce3e9"/>
+<text x="308" y="209" font-size="11" fill="#087f91" font-weight="600" text-anchor="start">POLICY</text>
+<text x="308" y="238" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Generate answer</text>
+<text x="308" y="263" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Exact tokens + logprobs</text>
+<rect x="550" y="182" width="210" height="104" rx="14" fill="#ffffff" stroke="#dce3e9"/>
+<text x="568" y="209" font-size="11" fill="#687882" font-weight="600" text-anchor="start">FINAL ARTIFACT</text>
+<text x="568" y="238" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Extract code</text>
+<text x="568" y="263" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Preserve original output</text>
+<rect x="810" y="182" width="220" height="104" rx="14" fill="#ffffff" stroke="#dce3e9"/>
+<text x="828" y="209" font-size="11" fill="#687882" font-weight="600" text-anchor="start">VERIFICATION</text>
+<text x="828" y="238" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Execute + render</text>
+<text x="828" y="263" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Task-specific scoring</text>
+<rect x="1080" y="182" width="320" height="104" rx="14" fill="#f0edfb" stroke="#dce3e9"/>
+<text x="1098" y="209" font-size="11" fill="#7160bc" font-weight="600" text-anchor="start">NEMO RL</text>
+<text x="1098" y="238" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Reward → group → update</text>
+<text x="1098" y="263" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Model failures ≠ service failures</text>
+<text x="870" y="157" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Sandbox / verifier</text>
+<text x="645" y="390" font-size="13" fill="#7160bc" font-weight="400" text-anchor="start">Policy sync for subsequent rollouts</text>
+<text x="40" y="478" font-size="13" fill="#687882" font-weight="400" text-anchor="start">No harness tool loop. Truncation and infrastructure validity are checked before a sample contributes to training.</text>
+</g></svg>
