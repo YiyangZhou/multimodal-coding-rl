@@ -1,0 +1,265 @@
+--- a/examples/configs/grpo_math_1B.yaml
++++ b/examples/configs/grpo_math_1B.yaml
+@@ -152,6 +152,10 @@
+   worker_extension_cls_fqn: null # optional registered policy-worker subclass; mutually exclusive with quant_cfg
+ 
+   dtensor_cfg:
++    # Optional bounded LM-head projection for Nemotron Omni; null keeps the standard path.
++    linear_logprob_chunk_size: null
++    # Optional host activation storage for long-context linear-logprob training.
++    activation_cpu_offload: false
+     enabled: true
+     checkpoint:
+       model_save_format: "safetensors"
+--- /dev/null
++++ b/nemo_rl/models/automodel/linear_logprobs.py
+@@ -0,0 +1,164 @@
++# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-License-Identifier: Apache-2.0
++
++"""Bounded-memory projection of sampled-token log probabilities.
++
++The caller owns FSDP weight materialization and reduction. This function accepts
++local tensors only and recomputes one projection chunk at a time in backward.
++It does not truncate sequence positions or change the vocabulary distribution.
++"""
++import math
++
++import torch
++from torch.autograd.function import once_differentiable
++from torch.distributed.tensor import DTensor
++
++
++def _selected(hidden, weight, targets, temperature, compute_dtype):
++    logits = torch.nn.functional.linear(hidden.to(compute_dtype), weight.to(compute_dtype)).float()
++    logits = logits / temperature
++    return logits.log_softmax(-1).gather(-1, targets.unsqueeze(-1)).squeeze(-1)
++
++
++class _Projection(torch.autograd.Function):
++    @staticmethod
++    def forward(ctx, hidden, weight, targets, temperature, chunk_size, compute_dtype):
++        ctx.save_for_backward(hidden, weight, targets)
++        ctx.temperature, ctx.chunk_size, ctx.compute_dtype = temperature, chunk_size, compute_dtype
++        flat_hidden = hidden.reshape(-1, hidden.shape[-1])
++        flat_targets = targets.reshape(-1)
++        output = torch.empty(flat_targets.shape, dtype=torch.float32, device=hidden.device)
++        for start in range(0, len(flat_targets), chunk_size):
++            end = min(start + chunk_size, len(flat_targets))
++            output[start:end] = _selected(flat_hidden[start:end], weight,
++                                          flat_targets[start:end], temperature, compute_dtype)
++        return output.reshape(targets.shape)
++
++    @staticmethod
++    @once_differentiable
++    def backward(ctx, grad_output):
++        hidden, weight, targets = ctx.saved_tensors
++        need_h, need_w = ctx.needs_input_grad[:2]
++        flat_hidden = hidden.reshape(-1, hidden.shape[-1])
++        flat_targets, flat_grad = targets.reshape(-1), grad_output.reshape(-1)
++        grad_hidden = torch.empty_like(flat_hidden) if need_h else None
++        # Accumulate BF16 chunk contributions in FP32, then cast once.
++        accumulation_dtype = torch.float64 if weight.dtype == torch.float64 else torch.float32
++        grad_weight = torch.zeros(weight.shape, device=weight.device, dtype=accumulation_dtype) if need_w else None
++        for start in range(0, len(flat_targets), ctx.chunk_size):
++            end = min(start + ctx.chunk_size, len(flat_targets))
++            with torch.enable_grad():
++                local_hidden = flat_hidden[start:end].detach().requires_grad_(need_h)
++                local_weight = weight.detach().requires_grad_(need_w)
++                inputs = [tensor for tensor, needed in ((local_hidden, need_h), (local_weight, need_w)) if needed]
++                result = _selected(local_hidden, local_weight, flat_targets[start:end],
++                                   ctx.temperature, ctx.compute_dtype)
++                gradients = iter(torch.autograd.grad(result, inputs, flat_grad[start:end]))
++                if need_h:
++                    grad_hidden[start:end] = next(gradients)
++                if need_w:
++                    grad_weight.add_(next(gradients))
++            del result, inputs, local_hidden, local_weight, gradients
++        return (grad_hidden.reshape_as(hidden) if need_h else None,
++                grad_weight.to(weight.dtype) if need_w else None,
++                None, None, None, None)
++
++
++def selected_logprobs(hidden, weight, targets, *, temperature, chunk_size, compute_dtype):
++    """Return [..., sequence] logprobs for caller-shifted targets.
++
++    Bias, TP-sharded vocabulary, top-k/p filtering and higher derivatives are
++    not implemented here. Native integration must reject those configurations.
++    """
++    if any(isinstance(t, DTensor) for t in (hidden, weight, targets)):
++        raise TypeError("Materialize the head through a verified FSDP/TP integration first")
++    if (hidden.ndim < 2 or weight.ndim != 2 or targets.shape != hidden.shape[:-1]
++            or hidden.shape[-1] != weight.shape[1] or not targets.numel()
++            or targets.dtype != torch.long or not hidden.is_floating_point()
++            or not weight.is_floating_point() or hidden.device != weight.device
++            or hidden.device != targets.device):
++        raise ValueError("Expected aligned local hidden states, head weight and integer targets")
++    if (type(chunk_size) is not int or chunk_size <= 0 or isinstance(temperature, bool)
++            or not math.isfinite(temperature) or temperature <= 0
++            or compute_dtype not in (torch.bfloat16, torch.float16, torch.float32, torch.float64)):
++        raise ValueError("Invalid projection chunk, compute dtype or temperature")
++    if int(targets.min()) < 0 or int(targets.max()) >= weight.shape[0]:
++        raise ValueError("Target token is outside the full head vocabulary")
++    return _Projection.apply(hidden, weight, targets, float(temperature), chunk_size, compute_dtype)
++
++
++def validate_projection_config(config, sampling_params, model_type):
++    """Reject unsupported opt-in layouts before model allocation."""
++    dtensor = config["dtensor_cfg"]
++    chunk_size = dtensor.get("linear_logprob_chunk_size")
++    activation_offload = dtensor.get("activation_cpu_offload")
++    if activation_offload is not None and type(activation_offload) is not bool:
++        raise ValueError("activation_cpu_offload must be boolean or null")
++    if activation_offload and (chunk_size is None or not dtensor["activation_checkpointing"]):
++        raise ValueError("Activation CPU offload requires linear logprobs and activation checkpointing")
++    if chunk_size is None:
++        return
++    from nemo_rl.algorithms.logits_sampling_utils import need_top_k_or_top_p_filtering
++
++    if type(chunk_size) is not int or chunk_size <= 0:
++        raise ValueError("linear_logprob_chunk_size must be a positive integer or null")
++    if (dtensor["tensor_parallel_size"] != 1 or dtensor["context_parallel_size"] != 1
++            or (dtensor.get("dp_replicate_size") not in (None, 1))
++            or config["sequence_packing"]["enabled"]):
++        raise ValueError("Linear logprobs currently require TP1, CP1, unreplicated FSDP and unpacked sequences")
++    if model_type != "nemotron_h_omni":
++        raise ValueError("Linear logprobs currently support the verified Nemotron Omni hidden-state contract")
++    if dtensor.get("lora_cfg") and dtensor["lora_cfg"]["enabled"]:
++        raise ValueError("Linear logprobs do not support an adapted LM head")
++    if need_top_k_or_top_p_filtering(sampling_params):
++        raise ValueError("Linear logprobs currently require unfiltered training probabilities")
++    if config.get("on_policy_distillation_full"):
++        raise ValueError("Full-vocabulary distillation requires the native logits path")
++    if config.get("reward_model_cfg") and config["reward_model_cfg"]["enabled"]:
++        raise ValueError("Reward models require the native logits path")
++
++
++def model_next_token_logprobs(model, model_batch, input_ids, *, chunk_size, sampling_params):
++    """Project inside the original head's FSDP forward/gradient lifecycle.
++
++    The scoped forward replacement touches no parameters or state-dict keys.
++    FSDP still materializes/offloads this same module and owns its gradients.
++    Backward recomputes local projection chunks; it does not call model/head
++    forward or depend on the temporary replacement remaining installed.
++    """
++    from types import MethodType
++    from nemo_automodel.components.utils.model_utils import get_lm_head_module
++    from nemo_rl.algorithms.logits_sampling_utils import need_top_k_or_top_p_filtering
++
++    if need_top_k_or_top_p_filtering(sampling_params):
++        raise ValueError("Filtered probabilities are not supported by linear logprobs")
++    if input_ids.ndim != 2 or input_ids.shape[1] < 2:
++        raise ValueError("Linear logprobs require a canonical [batch, sequence] token array")
++    head = get_lm_head_module(model)
++    if head is None or not isinstance(head, torch.nn.Linear) or head.bias is not None:
++        raise ValueError("Linear logprobs require an unadapted, bias-free linear LM head")
++    if "forward" in head.__dict__:
++        raise ValueError("An already overridden LM head cannot be replaced safely")
++    temperature = sampling_params.temperature if sampling_params is not None else 1.0
++    calls = 0
++
++    def project(module, hidden):
++        nonlocal calls
++        calls += 1
++        if calls != 1 or hidden.ndim != 3 or hidden.shape[:2] != input_ids.shape:
++            raise ValueError("Expected one full-sequence LM-head call per model forward")
++        if isinstance(module.weight, DTensor):
++            raise ValueError("FSDP must materialize the unsharded head before projection")
++        return selected_logprobs(hidden[:, :-1], module.weight, input_ids[:, 1:],
++                                temperature=temperature, chunk_size=chunk_size,
++                                compute_dtype=module.weight.dtype)
++
++    head.forward = MethodType(project, head)
++    try:
++        outputs = model(**(model_batch | {"logits_to_keep": 0, "output_hidden_states": False}))
++    finally:
++        del head.forward
++    result = outputs.logits
++    if calls != 1 or not isinstance(result, torch.Tensor) or result.shape != input_ids[:, 1:].shape:
++        raise ValueError("Model did not preserve the selected-logprob output shape")
++    return result
+--- a/nemo_rl/models/automodel/setup.py
++++ b/nemo_rl/models/automodel/setup.py
+@@ -370,6 +370,10 @@
+         **hf_config_overrides,
+     )
+ 
++    from nemo_rl.models.automodel.linear_logprobs import validate_projection_config
++
++    validate_projection_config(config, sampling_params, model_config.model_type)
++
+     # Check if model supports flash attention args
+     allow_flash_attn_args = True
+     if (
+--- a/nemo_rl/models/automodel/train.py
++++ b/nemo_rl/models/automodel/train.py
+@@ -337,6 +337,42 @@
+             "ScorePostProcessor does not support context_parallel_size > 1 "
+             "on the automodel backend. Set context_parallel_size=1."
+         )
++
++    dtensor_config = post_processing_fn.cfg.get("dtensor_cfg")
++    linear_chunk = dtensor_config.get("linear_logprob_chunk_size") if dtensor_config is not None else None
++    if linear_chunk is not None:
++        from nemo_rl.models.automodel.linear_logprobs import model_next_token_logprobs
++
++        if not isinstance(post_processing_fn, (LogprobsPostProcessor, LossPostProcessor)):
++            raise ValueError("This post-processor requires full vocabulary logits")
++        if prepared.cp_size != 1 or post_processing_fn.enable_seq_packing:
++            raise ValueError("Linear logprobs require CP1 and unpacked sequences")
++        if isinstance(post_processing_fn, LossPostProcessor) and post_processing_fn.loss_fn.input_type != LossInputType.LOGPROB:
++            raise ValueError("Linear projection requires a sampled-token logprob loss")
++        # Offload only tensors autograd saves; checkpoint recomputation, FSDP
++        # parameter ownership, token content and loss normalization stay native.
++        activation_context = (
++            torch.autograd.graph.save_on_cpu(pin_memory=True)
++            if torch.is_grad_enabled() and dtensor_config.get("activation_cpu_offload")
++            else nullcontext()
++        )
++        with activation_context:
++            next_logprobs = model_next_token_logprobs(
++                model, prepared.model_batch, processed_inputs.input_ids,
++                chunk_size=linear_chunk, sampling_params=sampling_params,
++            )
++        if isinstance(post_processing_fn, LossPostProcessor):
++            result, metrics = post_processing_fn.loss_fn(
++                next_token_logprobs=next_logprobs, data=data_dict,
++                global_valid_seqs=global_valid_seqs, global_valid_toks=global_valid_toks,
++            )
++        else:
++            token_logprobs = torch.cat([torch.zeros_like(next_logprobs[:, :1]), next_logprobs], dim=1)
++            lengths = data_dict["input_lengths"].to(token_logprobs.device)
++            valid_positions = torch.arange(token_logprobs.shape[1], device=token_logprobs.device)[None, :] < lengths[:, None]
++            result = token_logprobs * valid_positions
++            metrics = {"logprobs": result}
++        return result, metrics, processed_mb
+ 
+     # Model forward pass
+     outputs = model_forward(model, prepared.model_batch)
+--- a/nemo_rl/models/policy/__init__.py
++++ b/nemo_rl/models/policy/__init__.py
+@@ -217,6 +217,11 @@
+     # Model config
+     lora_cfg: NotRequired[LoRAConfig | LoRAConfigDisabled]
+     automodel_kwargs: NotRequired[AutomodelKwargs]
++    # Positive sequence chunk for bounded LM-head projection; null/absent disables.
++    # Currently Nemotron Omni, TP1/CP1, unpacked sampled-token logprob losses only.
++    linear_logprob_chunk_size: NotRequired[int | None]
++    # Save checkpoint inputs/head tensors to host memory; requires the linear path.
++    activation_cpu_offload: NotRequired[bool | None]
+     # Runtime
+     clear_cache_every_n_steps: NotRequired[int | None]
+     checkpoint: NotRequired[AutomodelCheckpointConfig]
+--- a/tests/unit/reference_configs/grpo_math_1B.yaml
++++ b/tests/unit/reference_configs/grpo_math_1B.yaml
+@@ -155,6 +155,10 @@
+   worker_extension_cls_fqn: null
+ 
+   dtensor_cfg:
++    # Optional bounded LM-head projection for Nemotron Omni; null keeps the standard path.
++    linear_logprob_chunk_size: null
++    # Optional host activation storage for long-context linear-logprob training.
++    activation_cpu_offload: false
+     enabled: true
+     checkpoint:
+       model_save_format: "safetensors"

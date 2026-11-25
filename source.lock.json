@@ -1,0 +1,39 @@
+{
+  "source": "Native integration fingerprints; public upstream compatibility must be verified separately",
+  "sha256": {
+    "nemo_rl": {
+      "pyproject.toml": "e318bb99fec68b4858bb2518832b74c88be242dcf5226a6f95ecfd0b43b43ae8",
+      "uv.lock": "a19f92129a1c2cc84c8aa7c229e27bf2f3e08c644e59866700f89c3480efc15c",
+      "examples/run_grpo_single_controller.py": "442f2082505b9534ec43376a2b84ab27ab3bd543472d6caad9394f51004dc625",
+      "nemo_rl/environments/nemo_gym.py": "bc18e626f0453aba7be3534a5914770310ca0bc8ed6444383843a87c14c54c6e",
+      "3rdparty/Automodel-workspace/Automodel/nemo_automodel/components/models/nemotron_omni/state_dict_adapter.py": "ef1bce74c045e48eb7c1b87a355f6d9d5a425017460d20ea633846a9512ccd0d",
+      "3rdparty/Automodel-workspace/Automodel/nemo_automodel/components/models/nemotron_v3/state_dict_adapter.py": "80d56412f3ae11f225b877f0584a67896071b291dffa19a30a8c1c463d20c4e1",
+      "nemo_rl/models/generation/vllm/patches.py": "95e34a1100e6562743be390d82c8336e3faad94e041260273c8a8e78cbc2ff9c",
+      "nemo_rl/experience/rollouts.py": "7a04e463498d17efe81435212aa636dfb27afb0f06cd2c29c3ad3bd466269b4f",
+      "nemo_rl/experience/rollout_manager.py": "ca1badc08f9af7a8cce8692f121c7a73147cd3e87131d223ee266ece52bc715f",
+      "nemo_rl/data/literal_media.py": "24431dce7690dbafe179697f857a8809644757b003c28c67e72b947b3e47570b",
+      "nemo_rl/models/generation/vllm/vllm_worker_async.py": "587ffabacd87c8cd93e41ee5a6395c7b1d5f8ba5d62d503fcea7a4ce26acd4a8",
+      "tests/unit/data/test_literal_media.py": "41770ed608666dd3e265ac012c82a9675efcad0a4526be72fc1f6f786bab7ffb",
+      "3rdparty/Automodel-workspace/Automodel/nemo_automodel/components/models/common/utils.py": "2fd53b7cbcf02dbacf1bcea36bb0c56d16cc9004e590df817386abc047206874",
+      "3rdparty/Automodel-workspace/Automodel/nemo_automodel/components/moe/experts.py": "d50d59720305151dcd16cdf0d9d65f92bc43185827d211c7cf512c17372a12a2",
+      "3rdparty/Automodel-workspace/Automodel/nemo_automodel/components/moe/chunked_experts.py": "f28ece6849eed8d57be9dbf091142383a1f79a15e908dd0070d2f64dcad17787"
+    }
+  },
+  "harness_pins": {
+    "codex": "0.144.4",
+    "opencode": "1.17.11",
+    "hermes": "26bb847a88493342ca1b194e0455b479073ae21d"
+  },
+  "hermes_dependency_locks": {
+    "pyproject.toml": "8ae56b8e25eb773d27373465cabe2428a0daca9e41b7f3534d5cda880939e350",
+    "uv.lock": "747bfa4e19e6650b9e1d3fd490a564665b4b400e3820660c244f39a1699a6cf1"
+  },
+  "sandbox_runtime_compatibility": {
+    "hermes_openai_sdk": "2.44.0",
+    "source": "Gym locked SDK; Hermes declares openai>=2,<3",
+    "reason": "Gym Responses schema requires OpenAI 2.44.0; Gym datasets requires the Gym fsspec pin; Hermes source declares exa-py absent from its older lock",
+    "scope": "Derived remote Hermes runtime only; upstream and training lockfiles unchanged",
+    "hermes_fsspec": "2025.9.0",
+    "hermes_exa_py": "2.9.0"
+  }
+}

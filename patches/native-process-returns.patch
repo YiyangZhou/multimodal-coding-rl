@@ -1,0 +1,361 @@
+--- a/examples/configs/grpo_math_1B_megatron_single_controller.yaml
++++ b/examples/configs/grpo_math_1B_megatron_single_controller.yaml
+@@ -220,6 +220,8 @@
+ # Ledger-authoritative token capture via NeMo-Gym. Off by default; the
+ # single-controller recovery options require it.
+ token_capture:
++  # Optional binder/advantage hooks; null retains episode-only GRPO.
++  process_returns: null
+   enabled: false
+   staging_partition: rollout_staging
+ 
+--- a/nemo_rl/algorithms/single_controller_utils/advantage_stage.py
++++ b/nemo_rl/algorithms/single_controller_utils/advantage_stage.py
+@@ -37,6 +37,8 @@
+ from typing import TYPE_CHECKING, Any, Optional
+ 
+ import torch
++
++from nemo_rl.experience.process_returns import ProcessReturnConfig, load_process_hook
+ 
+ from nemo_rl.algorithms.grpo import (
+     GRPOConfig,
+@@ -95,6 +97,7 @@
+     # the untruncated tensors: the controller stopped fetching them when the
+     # computation moved here.
+     train_data_dump_dir: Optional[str]
++    process_returns: Optional[ProcessReturnConfig] = None
+ 
+     @classmethod
+     def from_master_config(cls, master_config: Any) -> AdvantageStageConfig:
+@@ -118,6 +121,7 @@
+         loss_cfg = master_config.loss_fn
+         return cls(
+             advantage=AdvantageConfig(),
++            process_returns=master_config.token_capture.process_returns,
+             algo=algo_cfg,
+             is_ppo=is_ppo,
+             policy_logprobs_required=not (
+@@ -155,6 +159,8 @@
+             adv_cfg.mask_sample_field,
+             adv_cfg.truncated_field,
+         ]
++        if self.process_returns is not None:
++            fields.append("process_returns")
+         if self.message_level_advantage_penalties_enabled:
+             fields.extend(
+                 [
+@@ -337,6 +343,12 @@
+         self._dp_client = dp_client
+         self._config = config
+         self._advantage_estimator = advantage_estimator
++        self._process_advantage = None
++        if config.process_returns is not None:
++            if (config.is_ppo or config.teacher_logprobs_required or config.reference_logprobs_required
++                    or config.algo.adv_estimator.name != "grpo"):
++                raise ValueError("Process returns require GRPO without teacher/reference shaping")
++            self._process_advantage = load_process_hook(config.process_returns.advantage)
+         # One writer per shard: the pool runs these concurrently, so they must
+         # not share a file. The controller merges them on publish.
+         self._train_data_dump = (
+@@ -464,17 +476,27 @@
+         # the advantages; the group-relative ones return a bare tensor.
+         returns: Optional[torch.Tensor] = None
+         if has_valid_training_tokens:
+-            result = self._advantage_estimator.compute_advantage(
+-                prompt_ids=prompt_ids,
+-                rewards=rewards,
+-                mask=mask,
+-                repeated_batch=repeated_batch,
+-                # Real validity (token-capture placeholders carry sample_mask 0,
+-                # and mask_sample/overlong/seq-logprob-error rows are folded in
+-                # via final_sample_mask) instead of the hardwired all-ones.
+-                valid_mask=final_sample_mask,
+-                **kwargs,
+-            )
++            if self._process_advantage is not None:
++                result = self._process_advantage(
++                    prompt_ids=prompt_ids, rewards=rewards, mask=mask,
++                    token_returns=tensor_field(data, "process_returns"),
++                    valid_mask=final_sample_mask, estimator_config=cfg.algo.adv_estimator,
++                )
++                if (not isinstance(result, torch.Tensor) or result.shape != mask.shape
++                        or result.device != mask.device or not result.is_floating_point()
++                        or not bool(torch.isfinite(result).all().item())
++                        or bool((result[~mask.bool()] != 0).any().item())):
++                    raise ValueError("Process advantage hook returned invalid canonical advantages")
++            else:
++                result = self._advantage_estimator.compute_advantage(
++                    prompt_ids=prompt_ids,
++                    rewards=rewards,
++                    mask=mask,
++                    repeated_batch=repeated_batch,
++                    # All native infrastructure, length and logprob masks apply.
++                    valid_mask=final_sample_mask,
++                    **kwargs,
++                )
+             if cfg.is_ppo:
+                 advantages, returns = result
+             else:
+--- a/nemo_rl/algorithms/single_controller_utils/config.py
++++ b/nemo_rl/algorithms/single_controller_utils/config.py
+@@ -58,6 +58,7 @@
+ )
+ from nemo_rl.environments.nemo_gym import should_use_nemo_gym
+ from nemo_rl.experience.rollout_recovery import RecoveryGranularity
++from nemo_rl.experience.process_returns import ProcessReturnConfig
+ from nemo_rl.models.generation.vllm.config import (
+     VllmConfig,
+     parse_nvfp4_pertoken_rollout,
+@@ -642,6 +643,7 @@
+     # TQ partition holding per-call staged token deltas (cleared by the
+     # finalizer; distinct from the canonical rollout partition).
+     staging_partition: str = "rollout_staging"
++    process_returns: Optional[ProcessReturnConfig] = None
+     # Drop the whole group when fewer than this fraction of its rollouts
+     # produced valid rows (None keeps every group).
+     min_valid_fraction_per_group: Optional[float] = None
+@@ -664,6 +666,12 @@
+     defer_routed_experts_to_policy: bool = False
+     # Fixed CPU finalizer pool size; actors are never automatically replaced.
+     num_reassembler_workers: PositiveInt = 2
++
++    @model_validator(mode="after")
++    def validate_process_returns(self) -> "TokenCaptureConfig":
++        if self.process_returns is not None and not self.enabled:
++            raise ValueError("Process returns require verified token capture")
++        return self
+ 
+ 
+ @dataclass(frozen=True)
+@@ -867,6 +875,11 @@
+             raise ValueError(
+                 "At least one algorithm block must be set, either `grpo` or `ppo`."
+             )
++        if self.token_capture.process_returns is not None:
++            if self.grpo is None or self.grpo.adv_estimator.name != "grpo":
++                raise ValueError("Process returns require the GRPO estimator")
++            if opd_module.is_opd_enabled(self) or self.loss_fn.reference_policy_kl_penalty > 0:
++                raise ValueError("Process returns do not support teacher or reference-KL shaping")
+         return self
+ 
+ 
+--- a/nemo_rl/algorithms/single_controller_utils/setup.py
++++ b/nemo_rl/algorithms/single_controller_utils/setup.py
+@@ -2052,6 +2052,7 @@
+                 defer_routed_experts_to_policy=token_capture_cfg.defer_routed_experts_to_policy,
+                 max_seq_len=_generation_max_seq_len(generation_config),
+                 capture_media=capture_media,
++                process_returns=token_capture_cfg.process_returns,
+             ),
+             num_workers=token_capture_cfg.num_reassembler_workers,
+         )
+--- a/nemo_rl/data_plane/column_io.py
++++ b/nemo_rl/data_plane/column_io.py
+@@ -62,6 +62,7 @@
+         *OPD_FULL_FIELDS,
+         "advantages",
+         "returns",
++        "process_returns",
+         "values",
+         "token_mask",
+         "sample_mask",
+--- a/nemo_rl/data_plane/schema.py
++++ b/nemo_rl/data_plane/schema.py
+@@ -101,6 +101,7 @@
+     TRUNCATED,
+     "prompt_ids_for_adv",
+     "total_reward",
++    "process_returns",
+     "values",
+     "returns",
+     "teacher_reference_logprobs",
+--- a/nemo_rl/environments/nemo_gym.py
++++ b/nemo_rl/environments/nemo_gym.py
+@@ -990,6 +990,8 @@
+                 scored_response=scored_response,
+                 reward=float(nemo_gym_result.get("reward") or 0.0),
+             )
++            if "process_reward_payload" in nemo_gym_result:
++                receipt["process_reward_payload"] = nemo_gym_result["process_reward_payload"]
+         except (RuntimeError, OSError) as error:
+             # An unfetchable manifest finalizes as a placeholder row.
+             print(f"manifest({rollout_id}) fetch failed: {error}", flush=True)
+--- /dev/null
++++ b/nemo_rl/experience/process_returns.py
+@@ -0,0 +1,51 @@
++# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
++# SPDX-License-Identifier: Apache-2.0
++"""Opt-in process returns bound after native capture/media verification."""
++from __future__ import annotations
++
++from dataclasses import dataclass
++from importlib import import_module
++import math
++from typing import Callable
++
++from pydantic import BaseModel, StrictStr, field_validator
++
++
++class ProcessReturnConfig(BaseModel, extra="forbid"):
++    """Trusted application hooks; absent configuration retains episode rewards."""
++
++    binder: StrictStr
++    advantage: StrictStr
++
++    @field_validator("binder", "advantage")
++    @classmethod
++    def qualified_callable(cls, value: str) -> str:
++        if "." not in value or any(not part.isidentifier() for part in value.split(".")):
++            raise ValueError("Process-return hooks must name a module-qualified callable")
++        return value
++
++
++@dataclass(frozen=True)
++class ProcessReturns:
++    """Canonical sequence returns; prompt/tool positions must contain zero."""
++
++    episode_reward: float
++    token_returns: tuple[float, ...]
++
++    def validate(self, token_mask: list[float]) -> None:
++        if not math.isfinite(self.episode_reward):
++            raise ValueError("Process episode reward must be finite")
++        if len(self.token_returns) != len(token_mask):
++            raise ValueError("Process returns must cover the exact verified sequence")
++        for value, mask in zip(self.token_returns, token_mask, strict=True):
++            if not math.isfinite(value) or (mask == 0 and value != 0):
++                raise ValueError("Process returns must be finite and zero outside assistant spans")
++
++
++def load_process_hook(path: str) -> Callable:
++    """Resolve a callable from trusted run configuration before accepting work."""
++    module, name = path.rsplit(".", 1)
++    hook = getattr(import_module(module), name)
++    if not callable(hook):
++        raise TypeError(f"Configured process hook is not callable: {path}")
++    return hook
+--- a/nemo_rl/experience/rollout_reassembler.py
++++ b/nemo_rl/experience/rollout_reassembler.py
+@@ -52,6 +52,7 @@
+     TQTokenSource,
+ )
+ from nemo_rl.experience.payload import pack_payload
++from nemo_rl.experience.process_returns import ProcessReturnConfig, ProcessReturns, load_process_hook
+ from nemo_rl.experience.route_assembly import (
+     ROUTE_MISSING_SENTINEL,
+     RouteFragment,
+@@ -92,6 +93,7 @@
+     # structurally validated. None for text rollouts.
+     media: Optional[dict[str, PackedTensor]] = None
+     media_token_validity_mask: Optional[torch.Tensor] = None
++    process_returns: Optional[tuple[float, ...]] = None
+ 
+ 
+ @dataclass
+@@ -219,8 +221,10 @@
+         router_replay_enabled: bool = False,
+         defer_routed_experts_to_policy: bool = False,
+         capture_media: bool = False,
++        process_returns: Optional[ProcessReturnConfig] = None,
+     ) -> None:
+         self._dp_client = dp_client
++        self._process_binder = load_process_hook(process_returns.binder) if process_returns is not None else None
+         self._partition_id = partition_id
+         # Whether the staging partition carries media columns (setup's
+         # ``token_capture.enabled and processor is not None``). Text-only runs
+@@ -282,11 +286,17 @@
+ 
+         if receipt is None:
+             return rejected("missing_receipt", [])
++        if not isinstance(receipt, dict):
++            return rejected("invalid_receipt:not_a_mapping", [])
++        receipt = dict(receipt)
++        process_payload = receipt.pop("process_reward_payload", None)
+         try:
+             parsed = RolloutReceipt.model_validate(receipt)
+         except (TypeError, ValueError) as error:
+             return rejected(f"invalid_receipt:{error}", [])
+         staging_keys = [record.staging_key for record in parsed.manifest]
++        if process_payload is not None and self._process_binder is None:
++            return rejected("unexpected_process_rewards", staging_keys)
+         if parsed.rollout_id != rollout_id:
+             return rejected(f"identity_mismatch:{parsed.rollout_id}", staging_keys)
+         if parsed.failure_reason is not None:
+@@ -418,6 +428,18 @@
+                 if failure is not None:
+                     return rejected(f"route_assembly:{failure}", staging_keys)
+ 
++        process_returns = None
++        if self._process_binder is not None:
++            try:
++                bound = self._process_binder(row, final_reward=reward, payload=process_payload)
++                if not isinstance(bound, ProcessReturns):
++                    raise TypeError("Process binder must return ProcessReturns")
++                bound.validate(row.token_mask)
++            except (TypeError, ValueError) as error:
++                return rejected(f"invalid_process_returns:{error}", staging_keys)
++            reward = bound.episode_reward
++            process_returns = bound.token_returns
++
+         return FinalizedRollout(
+             rollout_id=rollout_id,
+             valid=True,
+@@ -434,6 +456,7 @@
+             route_plan=route_plan,
+             media=media,
+             media_token_validity_mask=media_mask,
++            process_returns=process_returns,
+         )
+ 
+     def _resolve_media(
+@@ -586,6 +609,8 @@
+         assert len(canonical_sample_ids) == len(rollout_ids), (
+             "canonical_sample_ids must be one per rollout"
+         )
++        if self._process_binder is not None and loss_multiplier != 1.0:
++            raise ValueError("Process returns currently require unit dataset loss weights")
+         _group_t0 = time.perf_counter()
+         rows = [
+             self.finalize_rollout(rollout_id, receipt, reward=reward)
+@@ -747,6 +772,14 @@
+                 dtype=torch.bool,
+             ),
+         }
++        if self._process_binder is not None:
++            returns_t = torch.zeros_like(token_mask)
++            for i, row in enumerate(rows):
++                if row.valid:
++                    if row.process_returns is None:
++                        raise RuntimeError("Verified process row is missing canonical returns")
++                    returns_t[i, :len(row.token_ids)] = torch.tensor(row.process_returns, dtype=torch.float32)
++            train_batch["process_returns"] = returns_t
+         if self._router_replay_enabled and not self._defer_routed_experts_to_policy:
+             has_routed_row = any(r.valid and r.routed_experts is not None for r in rows)
+             if not has_routed_row and self._routed_dims is None and not valid_rows:
+--- a/nemo_rl/experience/rollout_reassembler_actor.py
++++ b/nemo_rl/experience/rollout_reassembler_actor.py
+@@ -23,6 +23,7 @@
+ from nemo_rl.data_plane import DataPlaneConfig, build_data_plane_client
+ from nemo_rl.data_plane.adapters.tq_mooncake_checkpoint import run_checkpoint_command
+ from nemo_rl.experience.rollout_reassembler import FinalizedGroup, RolloutReassembler
++from nemo_rl.experience.process_returns import ProcessReturnConfig
+ from nemo_rl.utils.rpc_guard import assert_metadata_only
+ from nemo_rl.utils.venvs import make_actor_runtime_env
+ 
+@@ -60,6 +61,7 @@
+     max_seq_len: int
+     # Whether the staging partition carries media columns (VLM capture).
+     capture_media: bool
++    process_returns: Optional[ProcessReturnConfig] = None
+ 
+ 
+ @ray.remote(
+@@ -86,6 +88,7 @@
+             defer_routed_experts_to_policy=config.defer_routed_experts_to_policy,
+             max_seq_len=config.max_seq_len,
+             capture_media=config.capture_media,
++            process_returns=config.process_returns,
+         )
+ 
+     def mooncake_checkpoint(self, body: dict[str, Any]) -> dict[str, Any] | None:

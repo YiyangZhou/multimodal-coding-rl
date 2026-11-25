@@ -1,0 +1,10 @@
+{
+  "description": "Preserve explicitly configured fail-fast capture protection when constructing native Gym service config. Required for original-history opt-in. GPU acceptance remains separate.",
+  "files": {
+    "nemo_rl/environments/nemo_gym.py": {
+      "before_sha256": "6f83b0a75cef58f0017c20a1a0a3b8ab0550ac4f56f983058cb1825bb550641a",
+      "after_sha256": "7729bf9dbd681c799530cbb377b506d0a5117712d42347033872f1d71fa2dc79"
+    }
+  },
+  "patch_sha256": "bb6e76418c68c08356311a40e54bcad7b130a31f7c97cb3adbc27008fc9e4e64"
+}

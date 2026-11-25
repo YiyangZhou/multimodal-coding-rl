@@ -1,0 +1,26 @@
+{
+  "description": "Opt-in per-DP forward padding after linear-logprob patch; preserve a two-position forward minimum for masked one-token placeholders. TP1/CP1 fixed microbatch1 only.",
+  "patch_sha256": "658ef615cbaa2d7b99aa49887ff23654988e9a720198fe2108ebd93570865ffc",
+  "files": {
+    "examples/configs/grpo_math_1B.yaml": {
+      "before_sha256": "e5dd9026e732cb0209fc43e77d7fcb8441e0f9898d1d5bc9cc34bd9dd8019847",
+      "after_sha256": "733c6d386191b76832677036777a104c3354e60f7550433720aa3be7b0af4d22"
+    },
+    "nemo_rl/models/automodel/local_padding.py": {
+      "before_sha256": null,
+      "after_sha256": "9cb519a8c9a59dcd8ec66b80cfe886230fba7843f9ffc37ea6355b444485d81b"
+    },
+    "nemo_rl/models/policy/__init__.py": {
+      "before_sha256": "d5e3f50dc56f0f84031d90530e6fa9c30ad9f93a1626c7fc8b5c879abd0d598b",
+      "after_sha256": "01712e9994dad37c735c8424c8a37f35ab3f3e10b45dc6ac74e812665d62638b"
+    },
+    "nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py": {
+      "before_sha256": "18fa25b8ca2a57c0a9958166c9f93045e6182dbc49189f50eaadaaeecf711379",
+      "after_sha256": "8e181136ccd07397181d6cf2cdf9e8e3903b3048a109cdee06d2d10f45a51d5c"
+    },
+    "tests/unit/reference_configs/grpo_math_1B.yaml": {
+      "before_sha256": "57241eec4e1c24c5162d0522957e363029d6b83b04e79186a2240fc6e7194379",
+      "after_sha256": "1ab3dcc6c4366b2583002147f716dcbeab1c78fdb007bbaec1ab41343e320608"
+    }
+  }
+}

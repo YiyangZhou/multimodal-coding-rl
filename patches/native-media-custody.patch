@@ -1,0 +1,15 @@
+--- a/nemo_rl/experience/rollout_reassembler.py
++++ b/nemo_rl/experience/rollout_reassembler.py
+@@ -872,6 +872,12 @@
+             tags=tags,
+         )
+         _put_ms = (time.perf_counter() - _put_t0) * 1000.0
++        # Optional acceptance evidence must finish while staging and published
++        # rows are still owned here. Never rely on an external polling interval.
++        import os
++        if os.environ.get("MMRL_MEDIA_CUSTODY_DIR"):
++            from mmrl.media_custody import maybe_observe_published_group
++            maybe_observe_published_group(self, group_id, rows, sample_ids, tags)
+         _clear_ms = 0.0
+         if not self._defer_routed_experts_to_policy:
+             _clear_t0 = time.perf_counter()

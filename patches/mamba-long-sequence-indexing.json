@@ -1,0 +1,36 @@
+{
+  "description": "64-bit Triton indices and safe uint32 convolution staging for long strided Mamba tensors. Preserves floating-point operations, sequence lengths and dependency locks. GPU acceptance is separate.",
+  "patch_sha256": "c49a04eeb5f493dee9f9804c19b8947fe5ebbfdd5194c779a2bece6b3463fd83",
+  "runtime_versions": {
+    "torch": "2.13.0+cu130",
+    "triton": "3.7.1",
+    "mamba_ssm": "2.3.2.post1",
+    "causal_conv1d": "1.6.2.post1"
+  },
+  "files": {
+    "ssd_chunk_state.py": {
+      "before_sha256": "6d82771b2f62a7bf84c381c8ef8e4b579a95e0352021d117507a1072e4d71dcd",
+      "after_sha256": "3906a0bfaccd46f48f06f15520fcd1e06dcacc368e16df574d5b50de41a62676"
+    },
+    "ssd_chunk_scan.py": {
+      "before_sha256": "055b5ce4cb0f30c84c3e031d775f218227fa0b793359254a2465777097b224f9",
+      "after_sha256": "171f2d9675a51281f22f3db18485f61179ecf462fc71b24d4d4809ccb60ed907"
+    },
+    "ssd_state_passing.py": {
+      "before_sha256": "ae1fab6c680cb5312ef746862a2cf8e74157033c80878490cc64fa1f24f88b70",
+      "after_sha256": "a6ec572b0a261bc039c44063cd52f63190e5c39b0652bd8876938361f5049064"
+    },
+    "ssd_bmm.py": {
+      "before_sha256": "5059b16f8fa269cd84e8159ee3c6880e4ccf90e4bedf9c2d733e6bc2baff9587",
+      "after_sha256": "46a407f9b4e0f70b55dca9d8e440a411bc1d71b6e784d201610c8b199bc99784"
+    },
+    "ssd_combined.py": {
+      "before_sha256": "39c19c1e4c8e36982847079bc12b4f07ed3af03ac68f6a6653200ef80df5515d",
+      "after_sha256": "06224d9e2f417573822913c38fe70dc2ac03de3454c5860ac764d99f8d5fbae3"
+    },
+    "layernorm_gated.py": {
+      "before_sha256": "eb6252e247b90f1c8a75946efbc1a221e0c4da701b6757ddae49f3495cf7a42f",
+      "after_sha256": "3cdd9b34896bf004f30f083758eb55d7d696cae3457583c866eee509185bf97d"
+    }
+  }
+}

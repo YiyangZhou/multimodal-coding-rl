@@ -1,0 +1,18 @@
+{
+  "description": "Deployed Super multi-turn overlays; apply after the integrated ready-first native profile. Other model-specific restore paths are not covered.",
+  "files": {
+    "nemo_rl/algorithms/single_controller.py": {
+      "before_sha256": "b86aeee73c1c12f338470f5dcf65e008a8085f7abee1e9032b3db87ff8b715ae",
+      "after_sha256": "d58271ed39116a91b48234ff2716308f485f49667b2add7e59d3ba4edbbd65f2"
+    },
+    "nemo_rl/data_plane/adapters/transfer_queue.py": {
+      "before_sha256": "7b82bfbc7b689741c4a47693c4cc96f16addfb8700a756cb53655d6f48cbdbc8",
+      "after_sha256": "79b9e78d8a0d87e931146f933654ec84ca396b1dd74e6a3c45215b8743711d0c"
+    },
+    "nemo_rl/models/generation/vllm/vllm_worker_async.py": {
+      "before_sha256": "587ffabacd87c8cd93e41ee5a6395c7b1d5f8ba5d62d503fcea7a4ce26acd4a8",
+      "after_sha256": "7a6ae82bd5926654e37f3bd5dba2c06b9a28398fab21450545b4068611008419"
+    }
+  },
+  "patch_sha256": "2190d648f9f5dc8283db6da5272f8e7032f7840f9ec858fa6cf2b59b560669aa"
+}

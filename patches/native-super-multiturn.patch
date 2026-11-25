@@ -1,0 +1,123 @@
+--- a/nemo_rl/algorithms/single_controller.py
++++ b/nemo_rl/algorithms/single_controller.py
+@@ -303,6 +303,18 @@
+         if (policy_logprobs_required or field != "prev_logprobs")
+         and (reference_logprobs_required or field != "reference_policy_logprobs")
+     )
++
++
++async def _commit_snapshot_before_cancellation(function, *args, **kwargs):
++    """Join a filesystem commit thread before cancellation triggers cleanup."""
++    pending = asyncio.create_task(asyncio.to_thread(function, *args, **kwargs))
++    try:
++        return await asyncio.shield(pending)
++    except asyncio.CancelledError:
++        # Cancelling an await cannot stop the filesystem thread. Let its rename
++        # finish before the caller removes temporary state, preserving cancellation.
++        await asyncio.gather(pending, return_exceptions=True)
++        raise
+ 
+ 
+ @ray.remote(num_cpus=1, num_gpus=0)  # pragma: no cover
+@@ -4512,7 +4524,7 @@
+                 controller_sidecar_bytes += len(manifest_text.encode())
+                 sidecar_save_seconds = time.monotonic() - sidecar_save_started
+                 snapshot_commit_started = time.monotonic()
+-                await asyncio.to_thread(
++                await _commit_snapshot_before_cancellation(
+                     commit_snapshot,
+                     tmp_path,
+                     final_path,
+@@ -4522,8 +4534,9 @@
+                 )
+                 snapshot_commit_seconds = time.monotonic() - snapshot_commit_started
+             except BaseException:
+-                if tmp_path.exists():
+-                    await asyncio.to_thread(partial(shutil.rmtree, tmp_path))
++                # Preserve the original exception, especially CancelledError,
++                # if a concurrent commit already moved the temporary directory.
++                await asyncio.to_thread(partial(shutil.rmtree, tmp_path, ignore_errors=True))
+                 raise
+ 
+             self._last_rollout_snapshot_mutation_version = snapshot_cut.mutation_version
+--- a/nemo_rl/data_plane/adapters/transfer_queue.py
++++ b/nemo_rl/data_plane/adapters/transfer_queue.py
+@@ -1092,6 +1092,22 @@
+         fields = [f for f in fields if f not in already]
+         if not fields:
+             return
++        # A new client may attach to a restored, populated partition. Query
++        # authoritative metadata before warming: float placeholders must not
++        # be written into existing integer/media schemas. force_fetch reads
++        # metadata without consuming samples in the pinned TQ controller.
++        client = tq.get_client()
++        if partition_id in client.get_partition_list():
++            self._mark_data_operation_started()
++            existing = client.get_meta(
++                data_fields=fields, batch_size=0,
++                partition_id=partition_id, mode="force_fetch",
++            )
++            registered = set(existing.field_schema)
++            already.update(registered.intersection(fields))
++            fields = [f for f in fields if f not in already]
++            if not fields:
++                return
+         # Use a unique KV key instead of ``client.put``'s default row id
+         # (``0@field`` at the Mooncake storage layer). Mooncake does not
+         # support upsert, so repeated schema warmups can collide with
+--- a/nemo_rl/models/generation/vllm/vllm_worker_async.py
++++ b/nemo_rl/models/generation/vllm/vllm_worker_async.py
+@@ -987,7 +987,7 @@
+                     request.max_tokens = max_tokens
+ 
+             def _clamp_max_tokens(
+-                self, request, request_max_tokens: int, prompt_token_ids: list[int]
++                self, request, request_max_tokens: Optional[int], prompt_token_ids: list[int]
+             ) -> None:
+                 """Clamp the request's max output tokens so that input + output <= max_model_len."""
+                 remaining = self.model_config.max_model_len - len(prompt_token_ids)
+@@ -1004,6 +1004,8 @@
+                         parameter="input_tokens",
+                         value=len(prompt_token_ids),
+                     )
++                if request_max_tokens is None:
++                    return
+                 max_tokens = min(request_max_tokens, remaining)
+                 self._set_max_tokens(request, max_tokens)
+ 
+@@ -1123,12 +1125,11 @@
+                     or request.required_prefix_token_ids is None
+                 ):
+                     # Clamp the request's max output tokens so that input + output <= max_model_len.
+-                    if actual_request_max_tokens is not None:
+-                        self._clamp_max_tokens(
+-                            request,
+-                            actual_request_max_tokens,
+-                            res[1][0]["prompt_token_ids"],
+-                        )
++                    self._clamp_max_tokens(
++                        request,
++                        actual_request_max_tokens,
++                        res[1][0]["prompt_token_ids"],
++                    )
+                     # Token capture, text mode: the full render is the exact
+                     # engine prompt.
+                     media = await asyncio.to_thread(
+@@ -1204,12 +1205,11 @@
+                 engine_prompt["prompt_token_ids"] = final_prompt_token_ids
+ 
+                 # Clamp after prefix replacement since the prompt length may have changed.
+-                if actual_request_max_tokens is not None:
+-                    self._clamp_max_tokens(
+-                        request,
+-                        actual_request_max_tokens,
+-                        final_prompt_token_ids,
+-                    )
++                self._clamp_max_tokens(
++                    request,
++                    actual_request_max_tokens,
++                    final_prompt_token_ids,
++                )
+ 
+                 # Token capture, token-in mode: the spliced prompt is the
+                 # exact engine prompt; begin_call re-checks the prefix it

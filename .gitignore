@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+.env
+*.env
+secrets/
+runs/
+data/
+checkpoints/
+*.safetensors
+*.sqsh
+*.log
+.pytest_cache/
+*.jsonl

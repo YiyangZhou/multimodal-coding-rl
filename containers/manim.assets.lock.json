@@ -1,0 +1,12 @@
+{
+  "url": "https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/nation-10m.json",
+  "original_url": "https://cdn.jsdelivr.net/npm/us-atlas@3/nation-10m.json",
+  "sha256": "8ca8af2285b3c25268850d49adbe15de186d388dd20340ccbac72f83e35b6fe8",
+  "bytes": 80238,
+  "package": "us-atlas",
+  "version": "3.0.1",
+  "license": "ISC",
+  "container_path": "/opt/mmrl/assets/us-atlas-nation-10m.json",
+  "license_url": "https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/LICENSE",
+  "license_sha256": "8048290dfdb6e83fbed17e8985c8cfc4ce9da9b842642f3d3e497280790cfa31"
+}

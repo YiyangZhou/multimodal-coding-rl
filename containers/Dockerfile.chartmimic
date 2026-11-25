@@ -1,0 +1,14 @@
+# Separate from the Python 3.13 NeMo/harness environment.
+FROM docker.io/library/python@sha256:544a8ce1441b102e38eadb427845e876484f5177022fd45f7e1f39b983812333
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.revision=${SOURCE_REVISION}
+ENV PYTHONUNBUFFERED=1 MPLBACKEND=Agg
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    poppler-utils fonts-dejavu fonts-liberation ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY containers/chartmimic.hashed.requirements.txt /opt/mmrl/requirements.txt
+RUN python -m pip install --no-cache-dir --require-hashes -r /opt/mmrl/requirements.txt
+COPY mmrl/chartmimic_render.py /opt/mmrl/chartmimic_render.py
+RUN python /opt/mmrl/chartmimic_render.py --check
+WORKDIR /workspace
+CMD ["tail", "-f", "/dev/null"]

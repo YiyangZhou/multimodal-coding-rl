@@ -1,0 +1,106 @@
+--- a/examples/configs/grpo_math_1B.yaml
++++ b/examples/configs/grpo_math_1B.yaml
+@@ -156,6 +156,8 @@
+     linear_logprob_chunk_size: null
+     # Optional host activation storage for long-context linear-logprob training.
+     activation_cpu_offload: false
++    # Opt-in per-DP lengths; TP1/CP1, fixed microbatch 1 only.
++    local_forward_padding: false
+     enabled: true
+     checkpoint:
+       model_save_format: "safetensors"
+--- /dev/null
++++ b/nemo_rl/models/automodel/local_padding.py
+@@ -0,0 +1,34 @@
++# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++"""Guard the opt-in, per-DP forward materialization layout."""
++
++
++def validate_local_padding_config(config):
++    """Validate before allocating a model; collective counts must stay equal."""
++    dtensor = config["dtensor_cfg"]
++    enabled = dtensor.get("local_forward_padding")
++    if enabled is not None and type(enabled) is not bool:
++        raise ValueError("local_forward_padding must be boolean or null")
++    if not enabled:
++        return
++    if (dtensor["tensor_parallel_size"] != 1
++            or dtensor["context_parallel_size"] != 1
++            or dtensor.get("dp_replicate_size") not in (None, 1)
++            or config["sequence_packing"]["enabled"]
++            or config["dynamic_batching"]["enabled"]
++            or config["train_micro_batch_size"] != 1
++            or config["logprob_batch_size"] != 1):
++        raise ValueError("Local forward padding requires TP1/CP1, unreplicated FSDP, unpacked fixed microbatch size 1")
++    if not dtensor.get("linear_logprob_chunk_size"):
++        raise ValueError("Local forward padding requires the verified linear-logprob path")
+--- a/nemo_rl/models/policy/__init__.py
++++ b/nemo_rl/models/policy/__init__.py
+@@ -222,6 +222,8 @@
+     linear_logprob_chunk_size: NotRequired[int | None]
+     # Save checkpoint inputs/head tensors to host memory; requires the linear path.
+     activation_cpu_offload: NotRequired[bool | None]
++    # Materialize local DP lengths; optional, disabled unless explicitly true.
++    local_forward_padding: NotRequired[bool | None]
+     # Runtime
+     clear_cache_every_n_steps: NotRequired[int | None]
+     checkpoint: NotRequired[AutomodelCheckpointConfig]
+--- a/nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py
++++ b/nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py
+@@ -35,6 +35,7 @@
+ from nemo_rl.algorithms.logits_sampling_utils import TrainingSamplingParams
+ from nemo_rl.algorithms.loss.interfaces import LossFunction
+ from nemo_rl.algorithms.metric_utils import LEARNING_RATE_KEY
++from nemo_rl.data_plane.interfaces import KVBatchMeta
+ from nemo_rl.data_plane.worker_mixin import TQWorkerMixin
+ from nemo_rl.data_plane.schema import DP_PADDING_TAG
+ from nemo_rl.distributed.batched_data_dict import BatchedDataDict
+@@ -220,6 +221,15 @@
+         else:
+             return f"{self.__class__.__qualname__}"
+ 
++    def _forward_pad_seqlen(self, meta: "KVBatchMeta") -> int:
++        """Optionally materialize only this DP rank's actual sequence lengths."""
++        if self.cfg["dtensor_cfg"].get("local_forward_padding"):
++            # Rejected rollouts have one masked pad token. Keep a second
++            # forward-only pad position so next-token projection is defined.
++            # Stored tokens, logical lengths and loss masks stay unchanged.
++            return 2
++        return super()._forward_pad_seqlen(meta)
++
+     def _get_replica_group(self) -> Optional[Any]:
+         """Replica group = flattened (cp, tp) sub-mesh — see V1 worker."""
+         return self.device_mesh[("cp", "tp")]._flatten().get_group()
+@@ -257,6 +267,9 @@
+         init_telemetry_worker()
+ 
+         # Store configuration
++        from nemo_rl.models.automodel.local_padding import validate_local_padding_config
++
++        validate_local_padding_config(config)
+         self.cfg = config
+         self._buffered_train_step: Optional[BufferedTrainStep] = None
+ 
+--- a/tests/unit/reference_configs/grpo_math_1B.yaml
++++ b/tests/unit/reference_configs/grpo_math_1B.yaml
+@@ -159,6 +159,8 @@
+     linear_logprob_chunk_size: null
+     # Optional host activation storage for long-context linear-logprob training.
+     activation_cpu_offload: false
++    # Opt-in per-DP lengths; TP1/CP1, fixed microbatch 1 only.
++    local_forward_padding: false
+     enabled: true
+     checkpoint:
+       model_save_format: "safetensors"

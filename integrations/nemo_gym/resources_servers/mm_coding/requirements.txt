@@ -1,0 +1,2 @@
+# Discovery marker. This plugin uses the existing locked Gym environment.
+# Run scripts/bind_runtime.py first; automatic dependency resolution is unsupported.

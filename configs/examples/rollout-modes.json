@@ -1,0 +1,38 @@
+{
+  "single": {
+    "prepare_mode": "single"
+  },
+  "multi": {
+    "prepare_mode": "multi",
+    "harnesses": [
+      "opencode",
+      "codex",
+      "hermes"
+    ]
+  },
+  "mixed": {
+    "prepare_mode": "mixed",
+    "assignment": "per-prompt-group"
+  },
+  "sibling-mixed": {
+    "prepare_mode": "sibling-mixed",
+    "grpo": {
+      "num_prompts_per_step": 8,
+      "num_generations_per_prompt": 8
+    },
+    "routes": [
+      "single",
+      "single",
+      "opencode",
+      "opencode",
+      "codex",
+      "codex",
+      "hermes",
+      "hermes"
+    ],
+    "train_global_batch_size": 64,
+    "max_inflight_prompts": 16,
+    "max_new_tokens": 32768,
+    "max_model_len": 65536
+  }
+}

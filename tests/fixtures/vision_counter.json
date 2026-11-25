@@ -1,0 +1,12 @@
+{
+  "files": [
+    {
+      "path": "start.sh",
+      "content": "exec python /workspace/server.py\n"
+    },
+    {
+      "path": "server.py",
+      "content": "from http.server import HTTPServer, BaseHTTPRequestHandler\nimport json,sqlite3\nDB=sqlite3.connect('/workspace/data.db')\nDB.execute('create table if not exists counter (n integer)')\nif not DB.execute('select n from counter').fetchone(): DB.execute('insert into counter values (0)'); DB.commit()\nclass Handler(BaseHTTPRequestHandler):\n def do_GET(self):\n  n=DB.execute('select n from counter').fetchone()[0]\n  data=('<html><body><h1>Counter</h1><p id=\"counter\">Count: '+str(n)+'</p><button onclick=\"fetch(\\'/increment\\',{method:\\'POST\\'}).then(r=>r.json()).then(d=>document.getElementById(\\'counter\\').textContent=\\'Count: \\'+d.n)\">Increment</button></body></html>').encode()\n  self.send_response(200);self.send_header('Content-Type','text/html');self.end_headers();self.wfile.write(data)\n def do_POST(self):\n  DB.execute('update counter set n=n+1');DB.commit();data=json.dumps({'n':DB.execute('select n from counter').fetchone()[0]}).encode()\n  self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers();self.wfile.write(data)\nHTTPServer(('0.0.0.0',3000),Handler).serve_forever()\n"
+    }
+  ]
+}

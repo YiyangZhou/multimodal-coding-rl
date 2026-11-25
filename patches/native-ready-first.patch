@@ -1,0 +1,1133 @@
+--- a/examples/configs/grpo_math_1B.yaml
++++ b/examples/configs/grpo_math_1B.yaml
+@@ -152,6 +152,12 @@
+   worker_extension_cls_fqn: null # optional registered policy-worker subclass; mutually exclusive with quant_cfg
+ 
+   dtensor_cfg:
++    # Optional bounded LM-head projection for Nemotron Omni; null keeps the standard path.
++    linear_logprob_chunk_size: null
++    # Optional host activation storage for long-context linear-logprob training.
++    activation_cpu_offload: false
++    # Opt-in per-DP lengths; TP1/CP1, fixed microbatch 1 only.
++    local_forward_padding: false
+     enabled: true
+     checkpoint:
+       model_save_format: "safetensors"
+--- a/examples/configs/grpo_math_1B_megatron_single_controller.yaml
++++ b/examples/configs/grpo_math_1B_megatron_single_controller.yaml
+@@ -220,6 +220,8 @@
+ # Ledger-authoritative token capture via NeMo-Gym. Off by default; the
+ # single-controller recovery options require it.
+ token_capture:
++  # Optional binder/advantage hooks; null retains episode-only GRPO.
++  process_returns: null
+   enabled: false
+   staging_partition: rollout_staging
+ 
+--- a/nemo_rl/algorithms/async_utils/staleness_sampler.py
++++ b/nemo_rl/algorithms/async_utils/staleness_sampler.py
+@@ -476,9 +476,32 @@
+         buffer: TQReplayBuffer,
+         *,
+         max_staleness_versions: int,
++        admission_mode: Optional[Literal["trainer_gated", "capacity"]] = None,
+     ) -> None:
+         super().__init__(buffer, gate_window=max_staleness_versions)
+         self.max_staleness_versions = max_staleness_versions
++        if admission_mode is None:
++            admission_mode = ReadyFirstSamplerConfig().admission_mode
++        if admission_mode not in ("trainer_gated", "capacity"):
++            raise ValueError(f"Unknown ready-first admission mode: {admission_mode}")
++        self.admission_mode = admission_mode
++
++    async def wait_until_admissible(
++        self, *, trainer_version_fn: Callable[[], int]
++    ) -> None:
++        if self.admission_mode == "trainer_gated":
++            await super().wait_until_admissible(trainer_version_fn=trainer_version_fn)
++        # In capacity mode the controller's in-flight and buffer semaphores
++        # provide backpressure. Keep transactional admission/cursor persistence.
++
++    def required_buffer_capacity(self, groups_per_step: int) -> Optional[int]:
++        if self.admission_mode == "capacity":
++            return groups_per_step
++        return super().required_buffer_capacity(groups_per_step)
++
++    @property
++    def is_on_policy(self) -> bool:
++        return self.admission_mode == "trainer_gated" and super().is_on_policy
+ 
+     async def select(
+         self,
+@@ -632,6 +655,9 @@
+ 
+ class ReadyFirstSamplerConfig(BaseModel, extra="allow"):
+     name: Literal["ready_first"] = "ready_first"
++    # capacity: replenish under controller semaphores, retain admitted slow groups.
++    # No hard weight-age limit; importance correction remains mandatory.
++    admission_mode: Literal["trainer_gated", "capacity"] = "trainer_gated"
+     # How far generation may run ahead of the trainer, in dispatch batches.
+     max_staleness_versions: NonNegativeInt = 1
+ 
+@@ -703,6 +729,8 @@
+ ) -> Optional[int]:
+     """Return a sampler config's required capacity without constructing it."""
+     if isinstance(cfg, ReadyFirstSamplerConfig):
++        if cfg.admission_mode == "capacity":
++            return groups_per_step
+         return _gated_required_buffer_capacity(
+             groups_per_step,
+             gate_window=cfg.max_staleness_versions,
+@@ -819,6 +847,7 @@
+         sampler = sampler_cls(
+             buffer,
+             max_staleness_versions=cfg.max_staleness_versions,
++            admission_mode=cfg.admission_mode,
+         )
+     elif isinstance(cfg, WeightFifoSamplerConfig):
+         sampler = sampler_cls(
+--- a/nemo_rl/algorithms/grpo.py
++++ b/nemo_rl/algorithms/grpo.py
+@@ -325,7 +325,12 @@
+ )
+ 
+ 
++from nemo_rl.algorithms.length_penalty import LengthPenaltyConfig
++
++
+ class GRPOConfig(BaseModel, extra="allow"):
++    # None preserves the historical reward. Enabled only for captured single-turn GRPO.
++    length_penalty: LengthPenaltyConfig | None = None
+     num_prompts_per_step: int = 32
+     num_generations_per_prompt: int = 16
+     max_num_epochs: int = 1
+--- /dev/null
++++ b/nemo_rl/algorithms/length_penalty.py
+@@ -0,0 +1,83 @@
++"""Bounded quality-relative length shaping for single-turn captured GRPO.
++
++Raw reward columns remain immutable so checkpoint replay cannot compound the
++penalty. Call immediately before advantage computation, after sample masking.
++"""
++from typing import Literal
++from pydantic import BaseModel, Field, model_validator
++
++
++class LengthPenaltyConfig(BaseModel, extra="forbid"):
++    mode: Literal["fixed_total", "relative_thinking"] = "fixed_total"
++    quality_reward_floor: float = Field(default=0.72, ge=0.2, le=1)
++    comparison_atol: float = Field(default=1e-6, ge=0, le=1e-4)
++    near_best_reward_gap: float = Field(default=0.04, ge=0, le=0.1)
++    min_reference_samples: int = Field(default=3, ge=2, strict=True)
++    group_size: int = Field(default=16, ge=2, strict=True)
++    thinking_start_token_id: int = Field(default=12, ge=0, strict=True)
++    thinking_end_token_id: int = Field(default=13, ge=0, strict=True)
++    grace_tokens: int = Field(default=16384, ge=0, strict=True)
++    cap_tokens: int = Field(default=32768, gt=0, strict=True)
++    max_fraction: float = Field(default=0.03, ge=0, le=0.1)
++
++    @model_validator(mode="after")
++    def ordered_limits(self):
++        if self.cap_tokens <= self.grace_tokens:
++            raise ValueError("Length penalty cap must exceed grace length")
++        return self
++
++
++def shape_rewards(raw_rewards, token_mask, sample_mask, config, *, token_ids=None, group_ids=None):
++    import torch
++
++    if raw_rewards.ndim != 1 or sample_mask.shape != raw_rewards.shape:
++        raise ValueError("Expected one reward and sample mask per response")
++    if token_mask.ndim != 2 or token_mask.shape[0] != raw_rewards.shape[0]:
++        raise ValueError("Expected token mask with one row per response")
++    if not torch.isfinite(raw_rewards).all():
++        raise ValueError("Nonfinite rewards must not enter advantage computation")
++    if ((raw_rewards < 0) | (raw_rewards > 1)).any():
++        raise ValueError("Length shaping expects execution/quality rewards in [0, 1]")
++    if not ((token_mask == 0) | (token_mask == 1)).all():
++        raise ValueError("Generation token mask must be binary")
++    # Native capture marks only assistant-generated tokens, including thinking;
++    # input images, prompts, padding and tool observations have mask zero.
++    lengths = token_mask.sum(dim=-1)
++    if config.mode == "relative_thinking":
++        if token_ids is None or token_ids.shape != token_mask.shape or group_ids is None:
++            raise ValueError("Relative thinking shaping requires exact token IDs and rollout group IDs")
++        if len(group_ids) != len(raw_rewards):
++            raise ValueError("Group ID count does not match responses")
++        positions = torch.arange(token_ids.shape[1], device=token_ids.device)[None, :]
++        generated = token_mask.bool()
++        starts = token_ids == config.thinking_start_token_id
++        ends = (token_ids == config.thinking_end_token_id) & generated
++        first_generated = torch.where(generated, positions, token_ids.shape[1]).amin(dim=1)
++        opening = torch.where(starts, positions, token_ids.shape[1]).amin(dim=1)
++        closing = torch.where(ends, positions, token_ids.shape[1]).amin(dim=1)
++        reliable = (starts.sum(dim=1) == 1) & (ends.sum(dim=1) == 1) & (opening < first_generated)
++        thinking = (generated & (positions < closing[:, None])).sum(dim=1).float()
++        penalty = torch.zeros_like(raw_rewards)
++        for gid in dict.fromkeys(group_ids):
++            indexes = [i for i, value in enumerate(group_ids) if value == gid]
++            if len(indexes) != config.group_size:
++                raise ValueError("Relative thinking shaping requires a complete rollout group")
++            idx = torch.tensor(indexes, device=raw_rewards.device)
++            valid = sample_mask[idx] > 0
++            if not valid.any():
++                continue
++            best = raw_rewards[idx][valid].max()
++            reference = valid & reliable[idx] & (raw_rewards[idx] >= config.quality_reward_floor - config.comparison_atol) & (raw_rewards[idx] >= best - config.near_best_reward_gap - config.comparison_atol)
++            if reference.sum() < config.min_reference_samples:
++                continue
++            ref = torch.quantile(thinking[idx][reference], 0.5)
++            if ref <= 0:
++                continue
++            fraction = ((thinking[idx] - ref) / ref).clamp(0, 1)
++            penalty[idx] = raw_rewards[idx] * config.max_fraction * fraction * valid * reliable[idx]
++        return raw_rewards - penalty, penalty, lengths
++    fraction = ((lengths - config.grace_tokens) /
++                (config.cap_tokens - config.grace_tokens)).clamp(0, 1)
++    # Invalid/filtered responses remain excluded and do not get invented scores.
++    penalty = raw_rewards * config.max_fraction * fraction * (sample_mask > 0)
++    return raw_rewards - penalty, penalty, lengths
+--- a/nemo_rl/algorithms/single_controller.py
++++ b/nemo_rl/algorithms/single_controller.py
+@@ -802,6 +802,11 @@
+ 
+             await run_heldout_validation(self)
+ 
++        if os.environ.get("MMRL_FIXED_CASE_CONFIG"):
++            from mmrl.fixed_case_controller import run_fixed_cases
++
++            await run_fixed_cases(self, at_start=True)
++
+         # Start the rollout and train pumps, plus the watchdog
+         rollout_task = asyncio.create_task(self._rollout_pump())
+         train_task = asyncio.create_task(self._train_pump())
+@@ -908,6 +913,67 @@
+             "train_steps": self._train_steps,
+             "trainer_version": self._trainer_version,
+         }
++
++    async def run_collection(self, *, required_groups: int, timeout_s: float) -> dict[str, Any]:
++        """Save native rollout state without starting learner or weight-sync pumps.
++
++        Only a dedicated generation allocation with an already-loaded, audited
++        policy may call this. A timeout saves partial progress, not a trainable
++        batch. The normal run() entry remains unchanged.
++        """
++        if self._trainer is not None or self._weight_synchronizer is not None:
++            raise ValueError("collection-only entry requires no trainer or weight synchronizer")
++        if self._master_config.data_plane["backend"] != "simple":
++            raise ValueError("collection-only admission currently supports simple TQ")
++        if required_groups != self._algo_cfg.num_prompts_per_step or timeout_s <= 0:
++            raise ValueError("collection target must equal the configured update batch")
++        if self._master_config.rollout_checkpointing.snapshot_attempt_interval_s is None:
++            raise ValueError("collection requires periodic durable rollout snapshots")
++        version = self._trainer_version
++        step = self._train_steps
++        self._rollout_manager.set_weight_version(version)
++        restored = await self._maybe_restore_replay_buffer()
++        await self._maybe_restore_rollout_recovery(restored_replay_groups=restored)
++        await self._maybe_restore_replacement_reserve()
++        self._validate_restored_sampler_cursor()
++        tasks = [asyncio.create_task(self._rollout_pump()),
++                 asyncio.create_task(self._rollout_checkpoint_pump())]
++        deadline = time.monotonic() + timeout_s
++        try:
++            while True:
++                # Propagate producer/checkpointer failures before declaring success.
++                for task in tasks:
++                    if task.done():
++                        await task
++                        raise RuntimeError("collection pump ended before collection stopped")
++                ready = sum(self._buffer.ready_list)
++                if ready >= required_groups or time.monotonic() >= deadline:
++                    result = await self._save_rollout_checkpoint(force=True)
++                    if not result.saved:
++                        raise RuntimeError(f"collection snapshot was not saved: {result.reason}")
++                    for task in tasks:
++                        if task.done():
++                            await task
++                            raise RuntimeError("collection pump stopped during snapshot")
++                    if self._trainer_version != version or self._train_steps != step:
++                        raise RuntimeError("collection unexpectedly changed trainer state")
++                    return {"collection_saved": True, "ready_groups": ready,
++                            "required_groups": required_groups,
++                            "ready_for_learner": ready >= required_groups,
++                            "trainer_version": version, "train_steps": step,
++                            "optimizer_updates": 0}
++                await asyncio.sleep(1)
++        finally:
++            for task in tasks:
++                task.cancel()
++            await asyncio.gather(*tasks, return_exceptions=True)
++            for actor in self._finalizer_actors:
++                try:
++                    ray.kill(actor, no_restart=True)
++                except Exception as error:
++                    print(f"Finalizer cleanup failed: {type(error).__name__}", flush=True)
++            self._logger.finish()
++            await asyncio.to_thread(self._checkpointer.shutdown)
+ 
+     async def ping(self) -> dict[str, Any]:
+         """Liveness check — returns immediately if event loop is running."""
+@@ -3443,6 +3509,12 @@
+                 # Keep a completed optimizer update durable even if held-out
+                 # generation or scoring fails. The standard V2 checkpoint path
+                 # already snapshots completed replay groups with its own barrier.
++                if os.environ.get("MMRL_FIXED_CASE_CONFIG"):
++                    from mmrl.fixed_case_controller import run_fixed_cases
++
++                    with self._timer.time("fixed_cases"):
++                        await run_fixed_cases(self)
++
+                 validation_cfg = self._master_config.benchmark_validation
+                 if validation_cfg.enabled and (
+                     self._train_steps % validation_cfg.period == 0
+@@ -3494,6 +3566,30 @@
+             # the wandb step, and wandb silently discards anything logged
+             # against a step it has already committed -- no exception, no
+             # failed return, just an empty chart. grpo_sync had the same bug.
++            # Opt-in verifier metrics use exact physical rollout identities.
++            # Emit before committing this W&B step; never change training tensors.
++            verification_directory = os.environ.get("MMRL_VERIFICATION_LOG_DIR")
++            if verification_directory and is_policy_training_step:
++                from mmrl.training_metrics import metrics_for_step
++
++                try:
++                    overview = await asyncio.to_thread(
++                        metrics_for_step, self._logger.base_log_dir,
++                        verification_directory, self._train_steps,
++                    )
++                    overview_metrics = {
++                        key.removeprefix("overview/"): value
++                        for key, value in overview["metrics"].items()
++                    }
++                    overview_metrics["update_minutes"] = total_time / 60.0
++                    overview_metrics["collection_error"] = 0
++                except (OSError, ValueError, KeyError, TypeError) as exc:
++                    # Observability failures must be visible without changing reward.
++                    print(f"Verifier metrics unavailable: {type(exc).__name__}", flush=True)
++                    overview_metrics = {"collection_error": 1}
++                self._logger.log_metrics(
++                    overview_metrics, step=self._train_steps, prefix="overview"
++                )
+             self._log_data_plane_metrics(total_time)
+             # step_finished=True here since this is the final log of our current step.
+             self._logger.log_metrics(
+--- a/nemo_rl/algorithms/single_controller_utils/advantage_stage.py
++++ b/nemo_rl/algorithms/single_controller_utils/advantage_stage.py
+@@ -37,6 +37,8 @@
+ from typing import TYPE_CHECKING, Any, Optional
+ 
+ import torch
++
++from nemo_rl.experience.process_returns import ProcessReturnConfig, load_process_hook
+ 
+ from nemo_rl.algorithms.grpo import (
+     GRPOConfig,
+@@ -95,6 +97,7 @@
+     # the untruncated tensors: the controller stopped fetching them when the
+     # computation moved here.
+     train_data_dump_dir: Optional[str]
++    process_returns: Optional[ProcessReturnConfig] = None
+ 
+     @classmethod
+     def from_master_config(cls, master_config: Any) -> AdvantageStageConfig:
+@@ -118,6 +121,7 @@
+         loss_cfg = master_config.loss_fn
+         return cls(
+             advantage=AdvantageConfig(),
++            process_returns=master_config.token_capture.process_returns,
+             algo=algo_cfg,
+             is_ppo=is_ppo,
+             policy_logprobs_required=not (
+@@ -155,6 +159,8 @@
+             adv_cfg.mask_sample_field,
+             adv_cfg.truncated_field,
+         ]
++        if self.process_returns is not None:
++            fields.append("process_returns")
+         if self.message_level_advantage_penalties_enabled:
+             fields.extend(
+                 [
+@@ -171,6 +177,8 @@
+             fields.append(adv_cfg.teacher_logprobs_field)
+         if self.is_ppo:
+             fields.append(adv_cfg.values_field)
++        if isinstance(self.algo, GRPOConfig) and self.algo.length_penalty is not None:
++            fields.append(INPUT_IDS)
+         if self.train_data_dump_dir is not None:
+             # The dump is the only remaining reader of the raw prompt tokens:
+             # the baseline keys on the group-id tag now, so prompt_ids is not
+@@ -337,6 +345,12 @@
+         self._dp_client = dp_client
+         self._config = config
+         self._advantage_estimator = advantage_estimator
++        self._process_advantage = None
++        if config.process_returns is not None:
++            if (config.is_ppo or config.teacher_logprobs_required or config.reference_logprobs_required
++                    or config.algo.adv_estimator.name != "grpo"):
++                raise ValueError("Process returns require GRPO without teacher/reference shaping")
++            self._process_advantage = load_process_hook(config.process_returns.advantage)
+         # One writer per shard: the pool runs these concurrently, so they must
+         # not share a file. The controller merges them on publish.
+         self._train_data_dump = (
+@@ -427,6 +441,17 @@
+             seq_error_metrics["_num_valid_seqs_before"] = num_valid_seqs_before
+             seq_error_metrics["_num_valid_seqs_after"] = num_valid_seqs_after
+ 
++        raw_rewards = rewards.clone()
++        length_penalty = torch.zeros_like(rewards)
++        generated_lengths = token_mask.sum(dim=-1)
++        if isinstance(cfg.algo, GRPOConfig) and cfg.algo.length_penalty is not None:
++            if cfg.is_ppo or cfg.process_returns is not None or cfg.teacher_logprobs_required:
++                raise ValueError("Length shaping is supported only for scalar-reward GRPO")
++            from nemo_rl.algorithms.length_penalty import shape_rewards
++            rewards, length_penalty, generated_lengths = shape_rewards(
++                raw_rewards, token_mask, final_sample_mask, cfg.algo.length_penalty,
++                token_ids=tensor_field(data, INPUT_IDS), group_ids=row_group_ids(meta))
++
+         mask = token_mask * final_sample_mask.unsqueeze(-1)
+ 
+         repeated_batch: dict[str, torch.Tensor] = {
+@@ -464,17 +489,27 @@
+         # the advantages; the group-relative ones return a bare tensor.
+         returns: Optional[torch.Tensor] = None
+         if has_valid_training_tokens:
+-            result = self._advantage_estimator.compute_advantage(
+-                prompt_ids=prompt_ids,
+-                rewards=rewards,
+-                mask=mask,
+-                repeated_batch=repeated_batch,
+-                # Real validity (token-capture placeholders carry sample_mask 0,
+-                # and mask_sample/overlong/seq-logprob-error rows are folded in
+-                # via final_sample_mask) instead of the hardwired all-ones.
+-                valid_mask=final_sample_mask,
+-                **kwargs,
+-            )
++            if self._process_advantage is not None:
++                result = self._process_advantage(
++                    prompt_ids=prompt_ids, rewards=rewards, mask=mask,
++                    token_returns=tensor_field(data, "process_returns"),
++                    valid_mask=final_sample_mask, estimator_config=cfg.algo.adv_estimator,
++                )
++                if (not isinstance(result, torch.Tensor) or result.shape != mask.shape
++                        or result.device != mask.device or not result.is_floating_point()
++                        or not bool(torch.isfinite(result).all().item())
++                        or bool((result[~mask.bool()] != 0).any().item())):
++                    raise ValueError("Process advantage hook returned invalid canonical advantages")
++            else:
++                result = self._advantage_estimator.compute_advantage(
++                    prompt_ids=prompt_ids,
++                    rewards=rewards,
++                    mask=mask,
++                    repeated_batch=repeated_batch,
++                    # All native infrastructure, length and logprob masks apply.
++                    valid_mask=final_sample_mask,
++                    **kwargs,
++                )
+             if cfg.is_ppo:
+                 advantages, returns = result
+             else:
+@@ -504,7 +539,9 @@
+             )
+ 
+         response_advantages = torch.masked_select(advantages, mask.bool())
+-        reward_partial = RewardPartial.from_rows(rewards, final_sample_mask)
++        reward_partial = RewardPartial.from_rows(
++            rewards, final_sample_mask, raw_rewards=raw_rewards,
++            generated_lengths=generated_lengths)
+         opd_stat_sum = 0.0
+         opd_stat_sumsq = 0.0
+         opd_stat_count = 0
+@@ -560,6 +597,9 @@
+                     "sample_loss_mask": final_sample_mask,
+                     "pre_seq_error_sample_loss_mask": pre_seq_error_sample_mask,
+                     "rewards": rewards,
++                    "raw_quality_reward": raw_rewards,
++                    "length_penalty": length_penalty,
++                    "generated_tokens": generated_lengths,
+                     # Raw column: jagged when the chunk mixes prompt
+                     # lengths, so rows carry no zero padding. Not the
+                     # group-index key the estimator reduces over.
+--- a/nemo_rl/algorithms/single_controller_utils/config.py
++++ b/nemo_rl/algorithms/single_controller_utils/config.py
+@@ -58,6 +58,7 @@
+ )
+ from nemo_rl.environments.nemo_gym import should_use_nemo_gym
+ from nemo_rl.experience.rollout_recovery import RecoveryGranularity
++from nemo_rl.experience.process_returns import ProcessReturnConfig
+ from nemo_rl.models.generation.vllm.config import (
+     VllmConfig,
+     parse_nvfp4_pertoken_rollout,
+@@ -642,6 +643,7 @@
+     # TQ partition holding per-call staged token deltas (cleared by the
+     # finalizer; distinct from the canonical rollout partition).
+     staging_partition: str = "rollout_staging"
++    process_returns: Optional[ProcessReturnConfig] = None
+     # Drop the whole group when fewer than this fraction of its rollouts
+     # produced valid rows (None keeps every group).
+     min_valid_fraction_per_group: Optional[float] = None
+@@ -664,6 +666,12 @@
+     defer_routed_experts_to_policy: bool = False
+     # Fixed CPU finalizer pool size; actors are never automatically replaced.
+     num_reassembler_workers: PositiveInt = 2
++
++    @model_validator(mode="after")
++    def validate_process_returns(self) -> "TokenCaptureConfig":
++        if self.process_returns is not None and not self.enabled:
++            raise ValueError("Process returns require verified token capture")
++        return self
+ 
+ 
+ @dataclass(frozen=True)
+@@ -867,6 +875,11 @@
+             raise ValueError(
+                 "At least one algorithm block must be set, either `grpo` or `ppo`."
+             )
++        if self.token_capture.process_returns is not None:
++            if self.grpo is None or self.grpo.adv_estimator.name != "grpo":
++                raise ValueError("Process returns require the GRPO estimator")
++            if opd_module.is_opd_enabled(self) or self.loss_fn.reference_policy_kl_penalty > 0:
++                raise ValueError("Process returns do not support teacher or reference-KL shaping")
+         return self
+ 
+ 
+--- a/nemo_rl/algorithms/single_controller_utils/setup.py
++++ b/nemo_rl/algorithms/single_controller_utils/setup.py
+@@ -2052,6 +2052,7 @@
+                 defer_routed_experts_to_policy=token_capture_cfg.defer_routed_experts_to_policy,
+                 max_seq_len=_generation_max_seq_len(generation_config),
+                 capture_media=capture_media,
++                process_returns=token_capture_cfg.process_returns,
+             ),
+             num_workers=token_capture_cfg.num_reassembler_workers,
+         )
+--- a/nemo_rl/algorithms/single_controller_utils/utils.py
++++ b/nemo_rl/algorithms/single_controller_utils/utils.py
+@@ -123,12 +123,18 @@
+ 
+     weighted_total: float
+     weight: float
++    # Optional for compatibility with legacy producers of this internal record.
++    raw_weighted_total: float | None = None
++    generated_token_total: float | None = None
+ 
+     @classmethod
+     def from_rows(
+         cls,
+         rewards: torch.Tensor,
+         sample_mask: torch.Tensor | None = None,
++        *,
++        raw_rewards: torch.Tensor | None = None,
++        generated_lengths: torch.Tensor | None = None,
+     ) -> RewardPartial:
+         """Reduce one call's rewards, weighting by row validity when given.
+ 
+@@ -136,6 +142,8 @@
+         plain mean and callers that never had a mask keep their old numbers.
+         """
+         flat = rewards.flatten()
++        if sample_mask is None and (raw_rewards is not None or generated_lengths is not None):
++            sample_mask = torch.ones_like(flat)
+         if sample_mask is None:
+             return cls(
+                 weighted_total=float(flat.sum(dtype=torch.float64)),
+@@ -145,6 +153,10 @@
+         return cls(
+             weighted_total=float((flat * mask).sum(dtype=torch.float64)),
+             weight=float(mask.sum(dtype=torch.float64)),
++            raw_weighted_total=(float((raw_rewards.flatten() * mask).sum(dtype=torch.float64))
++                                if raw_rewards is not None else None),
++            generated_token_total=(float((generated_lengths.flatten() * mask).sum(dtype=torch.float64))
++                                   if generated_lengths is not None else None),
+         )
+ 
+ 
+@@ -222,6 +234,14 @@
+             if weight > 0
+             else 0.0
+         )
++        if all(part.raw_weighted_total is not None for part in reward_partials):
++            raw_total = sum(part.raw_weighted_total for part in reward_partials)
++            shaped_total = sum(part.weighted_total for part in reward_partials)
++            out["reward_raw_quality"] = raw_total / weight if weight else 0.0
++            out["reward_length_penalty"] = (raw_total - shaped_total) / weight if weight else 0.0
++        if all(part.generated_token_total is not None for part in reward_partials):
++            out["mean_gen_tokens_per_trained_sample"] = (
++                sum(part.generated_token_total for part in reward_partials) / weight if weight else 0.0)
+     if advantage_partials:
+         # A call whose mask selected nothing carries no min or max to merge.
+         populated = [partial for partial in advantage_partials if partial.count]
+--- a/nemo_rl/data_plane/column_io.py
++++ b/nemo_rl/data_plane/column_io.py
+@@ -62,6 +62,7 @@
+         *OPD_FULL_FIELDS,
+         "advantages",
+         "returns",
++        "process_returns",
+         "values",
+         "token_mask",
+         "sample_mask",
+--- a/nemo_rl/data_plane/schema.py
++++ b/nemo_rl/data_plane/schema.py
+@@ -101,6 +101,7 @@
+     TRUNCATED,
+     "prompt_ids_for_adv",
+     "total_reward",
++    "process_returns",
+     "values",
+     "returns",
+     "teacher_reference_logprobs",
+--- a/nemo_rl/environments/nemo_gym.py
++++ b/nemo_rl/environments/nemo_gym.py
+@@ -990,6 +990,8 @@
+                 scored_response=scored_response,
+                 reward=float(nemo_gym_result.get("reward") or 0.0),
+             )
++            if "process_reward_payload" in nemo_gym_result:
++                receipt["process_reward_payload"] = nemo_gym_result["process_reward_payload"]
+         except (RuntimeError, OSError) as error:
+             # An unfetchable manifest finalizes as a placeholder row.
+             print(f"manifest({rollout_id}) fetch failed: {error}", flush=True)
+--- /dev/null
++++ b/nemo_rl/experience/process_returns.py
+@@ -0,0 +1,51 @@
++# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
++# SPDX-License-Identifier: Apache-2.0
++"""Opt-in process returns bound after native capture/media verification."""
++from __future__ import annotations
++
++from dataclasses import dataclass
++from importlib import import_module
++import math
++from typing import Callable
++
++from pydantic import BaseModel, StrictStr, field_validator
++
++
++class ProcessReturnConfig(BaseModel, extra="forbid"):
++    """Trusted application hooks; absent configuration retains episode rewards."""
++
++    binder: StrictStr
++    advantage: StrictStr
++
++    @field_validator("binder", "advantage")
++    @classmethod
++    def qualified_callable(cls, value: str) -> str:
++        if "." not in value or any(not part.isidentifier() for part in value.split(".")):
++            raise ValueError("Process-return hooks must name a module-qualified callable")
++        return value
++
++
++@dataclass(frozen=True)
++class ProcessReturns:
++    """Canonical sequence returns; prompt/tool positions must contain zero."""
++
++    episode_reward: float
++    token_returns: tuple[float, ...]
++
++    def validate(self, token_mask: list[float]) -> None:
++        if not math.isfinite(self.episode_reward):
++            raise ValueError("Process episode reward must be finite")
++        if len(self.token_returns) != len(token_mask):
++            raise ValueError("Process returns must cover the exact verified sequence")
++        for value, mask in zip(self.token_returns, token_mask, strict=True):
++            if not math.isfinite(value) or (mask == 0 and value != 0):
++                raise ValueError("Process returns must be finite and zero outside assistant spans")
++
++
++def load_process_hook(path: str) -> Callable:
++    """Resolve a callable from trusted run configuration before accepting work."""
++    module, name = path.rsplit(".", 1)
++    hook = getattr(import_module(module), name)
++    if not callable(hook):
++        raise TypeError(f"Configured process hook is not callable: {path}")
++    return hook
+--- a/nemo_rl/experience/rollout_reassembler.py
++++ b/nemo_rl/experience/rollout_reassembler.py
+@@ -52,6 +52,7 @@
+     TQTokenSource,
+ )
+ from nemo_rl.experience.payload import pack_payload
++from nemo_rl.experience.process_returns import ProcessReturnConfig, ProcessReturns, load_process_hook
+ from nemo_rl.experience.route_assembly import (
+     ROUTE_MISSING_SENTINEL,
+     RouteFragment,
+@@ -92,6 +93,7 @@
+     # structurally validated. None for text rollouts.
+     media: Optional[dict[str, PackedTensor]] = None
+     media_token_validity_mask: Optional[torch.Tensor] = None
++    process_returns: Optional[tuple[float, ...]] = None
+ 
+ 
+ @dataclass
+@@ -219,8 +221,10 @@
+         router_replay_enabled: bool = False,
+         defer_routed_experts_to_policy: bool = False,
+         capture_media: bool = False,
++        process_returns: Optional[ProcessReturnConfig] = None,
+     ) -> None:
+         self._dp_client = dp_client
++        self._process_binder = load_process_hook(process_returns.binder) if process_returns is not None else None
+         self._partition_id = partition_id
+         # Whether the staging partition carries media columns (setup's
+         # ``token_capture.enabled and processor is not None``). Text-only runs
+@@ -282,11 +286,17 @@
+ 
+         if receipt is None:
+             return rejected("missing_receipt", [])
++        if not isinstance(receipt, dict):
++            return rejected("invalid_receipt:not_a_mapping", [])
++        receipt = dict(receipt)
++        process_payload = receipt.pop("process_reward_payload", None)
+         try:
+             parsed = RolloutReceipt.model_validate(receipt)
+         except (TypeError, ValueError) as error:
+             return rejected(f"invalid_receipt:{error}", [])
+         staging_keys = [record.staging_key for record in parsed.manifest]
++        if process_payload is not None and self._process_binder is None:
++            return rejected("unexpected_process_rewards", staging_keys)
+         if parsed.rollout_id != rollout_id:
+             return rejected(f"identity_mismatch:{parsed.rollout_id}", staging_keys)
+         if parsed.failure_reason is not None:
+@@ -418,6 +428,18 @@
+                 if failure is not None:
+                     return rejected(f"route_assembly:{failure}", staging_keys)
+ 
++        process_returns = None
++        if self._process_binder is not None:
++            try:
++                bound = self._process_binder(row, final_reward=reward, payload=process_payload)
++                if not isinstance(bound, ProcessReturns):
++                    raise TypeError("Process binder must return ProcessReturns")
++                bound.validate(row.token_mask)
++            except (TypeError, ValueError) as error:
++                return rejected(f"invalid_process_returns:{error}", staging_keys)
++            reward = bound.episode_reward
++            process_returns = bound.token_returns
++
+         return FinalizedRollout(
+             rollout_id=rollout_id,
+             valid=True,
+@@ -434,6 +456,7 @@
+             route_plan=route_plan,
+             media=media,
+             media_token_validity_mask=media_mask,
++            process_returns=process_returns,
+         )
+ 
+     def _resolve_media(
+@@ -586,6 +609,8 @@
+         assert len(canonical_sample_ids) == len(rollout_ids), (
+             "canonical_sample_ids must be one per rollout"
+         )
++        if self._process_binder is not None and loss_multiplier != 1.0:
++            raise ValueError("Process returns currently require unit dataset loss weights")
+         _group_t0 = time.perf_counter()
+         rows = [
+             self.finalize_rollout(rollout_id, receipt, reward=reward)
+@@ -747,6 +772,14 @@
+                 dtype=torch.bool,
+             ),
+         }
++        if self._process_binder is not None:
++            returns_t = torch.zeros_like(token_mask)
++            for i, row in enumerate(rows):
++                if row.valid:
++                    if row.process_returns is None:
++                        raise RuntimeError("Verified process row is missing canonical returns")
++                    returns_t[i, :len(row.token_ids)] = torch.tensor(row.process_returns, dtype=torch.float32)
++            train_batch["process_returns"] = returns_t
+         if self._router_replay_enabled and not self._defer_routed_experts_to_policy:
+             has_routed_row = any(r.valid and r.routed_experts is not None for r in rows)
+             if not has_routed_row and self._routed_dims is None and not valid_rows:
+@@ -799,6 +832,10 @@
+             group_id=group_id,
+             prompt_idx=prompt_idx,
+         )
++        # Retain the physical attempt identity for verifier/media attribution.
++        # Stable training IDs may differ after recovery; never infer this mapping.
++        for tag, physical_rollout_id in zip(tags, rollout_ids, strict=True):
++            tag["verification_rollout_id"] = physical_rollout_id
+         if self._defer_routed_experts_to_policy:
+             encoded_sizes = 0
+             span_count = 0
+--- a/nemo_rl/experience/rollout_reassembler_actor.py
++++ b/nemo_rl/experience/rollout_reassembler_actor.py
+@@ -23,6 +23,7 @@
+ from nemo_rl.data_plane import DataPlaneConfig, build_data_plane_client
+ from nemo_rl.data_plane.adapters.tq_mooncake_checkpoint import run_checkpoint_command
+ from nemo_rl.experience.rollout_reassembler import FinalizedGroup, RolloutReassembler
++from nemo_rl.experience.process_returns import ProcessReturnConfig
+ from nemo_rl.utils.rpc_guard import assert_metadata_only
+ from nemo_rl.utils.venvs import make_actor_runtime_env
+ 
+@@ -60,6 +61,7 @@
+     max_seq_len: int
+     # Whether the staging partition carries media columns (VLM capture).
+     capture_media: bool
++    process_returns: Optional[ProcessReturnConfig] = None
+ 
+ 
+ @ray.remote(
+@@ -86,6 +88,7 @@
+             defer_routed_experts_to_policy=config.defer_routed_experts_to_policy,
+             max_seq_len=config.max_seq_len,
+             capture_media=config.capture_media,
++            process_returns=config.process_returns,
+         )
+ 
+     def mooncake_checkpoint(self, body: dict[str, Any]) -> dict[str, Any] | None:
+--- /dev/null
++++ b/nemo_rl/models/automodel/linear_logprobs.py
+@@ -0,0 +1,166 @@
++# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-License-Identifier: Apache-2.0
++
++"""Bounded-memory projection of sampled-token log probabilities.
++
++The caller owns FSDP weight materialization and reduction. This function accepts
++local tensors only and recomputes one projection chunk at a time in backward.
++It does not truncate sequence positions or change the vocabulary distribution.
++"""
++import math
++
++import torch
++from torch.autograd.function import once_differentiable
++from torch.distributed.tensor import DTensor
++
++
++def _selected(hidden, weight, targets, temperature, compute_dtype):
++    logits = torch.nn.functional.linear(hidden.to(compute_dtype), weight.to(compute_dtype)).float()
++    logits = logits / temperature
++    return logits.log_softmax(-1).gather(-1, targets.unsqueeze(-1)).squeeze(-1)
++
++
++class _Projection(torch.autograd.Function):
++    @staticmethod
++    def forward(ctx, hidden, weight, targets, temperature, chunk_size, compute_dtype):
++        ctx.save_for_backward(hidden, weight, targets)
++        ctx.temperature, ctx.chunk_size, ctx.compute_dtype = temperature, chunk_size, compute_dtype
++        flat_hidden = hidden.reshape(-1, hidden.shape[-1])
++        flat_targets = targets.reshape(-1)
++        output = torch.empty(flat_targets.shape, dtype=torch.float32, device=hidden.device)
++        for start in range(0, len(flat_targets), chunk_size):
++            end = min(start + chunk_size, len(flat_targets))
++            output[start:end] = _selected(flat_hidden[start:end], weight,
++                                          flat_targets[start:end], temperature, compute_dtype)
++        return output.reshape(targets.shape)
++
++    @staticmethod
++    @once_differentiable
++    def backward(ctx, grad_output):
++        hidden, weight, targets = ctx.saved_tensors
++        need_h, need_w = ctx.needs_input_grad[:2]
++        flat_hidden = hidden.reshape(-1, hidden.shape[-1])
++        flat_targets, flat_grad = targets.reshape(-1), grad_output.reshape(-1)
++        grad_hidden = torch.empty_like(flat_hidden) if need_h else None
++        # Accumulate BF16 chunk contributions in FP32, then cast once.
++        accumulation_dtype = torch.float64 if weight.dtype == torch.float64 else torch.float32
++        grad_weight = torch.zeros(weight.shape, device=weight.device, dtype=accumulation_dtype) if need_w else None
++        for start in range(0, len(flat_targets), ctx.chunk_size):
++            end = min(start + ctx.chunk_size, len(flat_targets))
++            with torch.enable_grad():
++                local_hidden = flat_hidden[start:end].detach().requires_grad_(need_h)
++                local_weight = weight.detach().requires_grad_(need_w)
++                inputs = [tensor for tensor, needed in ((local_hidden, need_h), (local_weight, need_w)) if needed]
++                result = _selected(local_hidden, local_weight, flat_targets[start:end],
++                                   ctx.temperature, ctx.compute_dtype)
++                gradients = iter(torch.autograd.grad(result, inputs, flat_grad[start:end]))
++                if need_h:
++                    grad_hidden[start:end] = next(gradients)
++                if need_w:
++                    grad_weight.add_(next(gradients))
++            del result, inputs, local_hidden, local_weight, gradients
++        return (grad_hidden.reshape_as(hidden) if need_h else None,
++                grad_weight.to(weight.dtype) if need_w else None,
++                None, None, None, None)
++
++
++def selected_logprobs(hidden, weight, targets, *, temperature, chunk_size, compute_dtype):
++    """Return [..., sequence] logprobs for caller-shifted targets.
++
++    Bias, TP-sharded vocabulary, top-k/p filtering and higher derivatives are
++    not implemented here. Native integration must reject those configurations.
++    """
++    if any(isinstance(t, DTensor) for t in (hidden, weight, targets)):
++        raise TypeError("Materialize the head through a verified FSDP/TP integration first")
++    if (hidden.ndim < 2 or weight.ndim != 2 or targets.shape != hidden.shape[:-1]
++            or hidden.shape[-1] != weight.shape[1] or not targets.numel()
++            or targets.dtype != torch.long or not hidden.is_floating_point()
++            or not weight.is_floating_point() or hidden.device != weight.device
++            or hidden.device != targets.device):
++        raise ValueError("Expected aligned local hidden states, head weight and integer targets")
++    if (type(chunk_size) is not int or chunk_size <= 0 or isinstance(temperature, bool)
++            or not math.isfinite(temperature) or temperature <= 0
++            or compute_dtype not in (torch.bfloat16, torch.float16, torch.float32, torch.float64)):
++        raise ValueError("Invalid projection chunk, compute dtype or temperature")
++    if int(targets.min()) < 0 or int(targets.max()) >= weight.shape[0]:
++        raise ValueError("Target token is outside the full head vocabulary")
++    return _Projection.apply(hidden, weight, targets, float(temperature), chunk_size, compute_dtype)
++
++
++def validate_projection_config(config, sampling_params, model_type):
++    """Reject unsupported opt-in layouts before model allocation."""
++    dtensor = config["dtensor_cfg"]
++    chunk_size = dtensor.get("linear_logprob_chunk_size")
++    activation_offload = dtensor.get("activation_cpu_offload")
++    if type(dtensor.get("activation_cpu_offload_pin_memory", True)) is not bool:
++        raise ValueError("activation_cpu_offload_pin_memory must be boolean")
++    if activation_offload is not None and type(activation_offload) is not bool:
++        raise ValueError("activation_cpu_offload must be boolean or null")
++    if activation_offload and (chunk_size is None or not dtensor["activation_checkpointing"]):
++        raise ValueError("Activation CPU offload requires linear logprobs and activation checkpointing")
++    if chunk_size is None:
++        return
++    from nemo_rl.algorithms.logits_sampling_utils import need_top_k_or_top_p_filtering
++
++    if type(chunk_size) is not int or chunk_size <= 0:
++        raise ValueError("linear_logprob_chunk_size must be a positive integer or null")
++    if (dtensor["tensor_parallel_size"] != 1 or dtensor["context_parallel_size"] != 1
++            or (dtensor.get("dp_replicate_size") not in (None, 1))
++            or config["sequence_packing"]["enabled"]):
++        raise ValueError("Linear logprobs currently require TP1, CP1, unreplicated FSDP and unpacked sequences")
++    if model_type != "nemotron_h_omni":
++        raise ValueError("Linear logprobs currently support the verified Nemotron Omni hidden-state contract")
++    if dtensor.get("lora_cfg") and dtensor["lora_cfg"]["enabled"]:
++        raise ValueError("Linear logprobs do not support an adapted LM head")
++    if need_top_k_or_top_p_filtering(sampling_params):
++        raise ValueError("Linear logprobs currently require unfiltered training probabilities")
++    if config.get("on_policy_distillation_full"):
++        raise ValueError("Full-vocabulary distillation requires the native logits path")
++    if config.get("reward_model_cfg") and config["reward_model_cfg"]["enabled"]:
++        raise ValueError("Reward models require the native logits path")
++
++
++def model_next_token_logprobs(model, model_batch, input_ids, *, chunk_size, sampling_params):
++    """Project inside the original head's FSDP forward/gradient lifecycle.
++
++    The scoped forward replacement touches no parameters or state-dict keys.
++    FSDP still materializes/offloads this same module and owns its gradients.
++    Backward recomputes local projection chunks; it does not call model/head
++    forward or depend on the temporary replacement remaining installed.
++    """
++    from types import MethodType
++    from nemo_automodel.components.utils.model_utils import get_lm_head_module
++    from nemo_rl.algorithms.logits_sampling_utils import need_top_k_or_top_p_filtering
++
++    if need_top_k_or_top_p_filtering(sampling_params):
++        raise ValueError("Filtered probabilities are not supported by linear logprobs")
++    if input_ids.ndim != 2 or input_ids.shape[1] < 2:
++        raise ValueError("Linear logprobs require a canonical [batch, sequence] token array")
++    head = get_lm_head_module(model)
++    if head is None or not isinstance(head, torch.nn.Linear) or head.bias is not None:
++        raise ValueError("Linear logprobs require an unadapted, bias-free linear LM head")
++    if "forward" in head.__dict__:
++        raise ValueError("An already overridden LM head cannot be replaced safely")
++    temperature = sampling_params.temperature if sampling_params is not None else 1.0
++    calls = 0
++
++    def project(module, hidden):
++        nonlocal calls
++        calls += 1
++        if calls != 1 or hidden.ndim != 3 or hidden.shape[:2] != input_ids.shape:
++            raise ValueError("Expected one full-sequence LM-head call per model forward")
++        if isinstance(module.weight, DTensor):
++            raise ValueError("FSDP must materialize the unsharded head before projection")
++        return selected_logprobs(hidden[:, :-1], module.weight, input_ids[:, 1:],
++                                temperature=temperature, chunk_size=chunk_size,
++                                compute_dtype=module.weight.dtype)
++
++    head.forward = MethodType(project, head)
++    try:
++        outputs = model(**(model_batch | {"logits_to_keep": 0, "output_hidden_states": False}))
++    finally:
++        del head.forward
++    result = outputs.logits
++    if calls != 1 or not isinstance(result, torch.Tensor) or result.shape != input_ids[:, 1:].shape:
++        raise ValueError("Model did not preserve the selected-logprob output shape")
++    return result
+--- /dev/null
++++ b/nemo_rl/models/automodel/local_padding.py
+@@ -0,0 +1,34 @@
++# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++"""Guard the opt-in, per-DP forward materialization layout."""
++
++
++def validate_local_padding_config(config):
++    """Validate before allocating a model; collective counts must stay equal."""
++    dtensor = config["dtensor_cfg"]
++    enabled = dtensor.get("local_forward_padding")
++    if enabled is not None and type(enabled) is not bool:
++        raise ValueError("local_forward_padding must be boolean or null")
++    if not enabled:
++        return
++    if (dtensor["tensor_parallel_size"] != 1
++            or dtensor["context_parallel_size"] != 1
++            or dtensor.get("dp_replicate_size") not in (None, 1)
++            or config["sequence_packing"]["enabled"]
++            or config["dynamic_batching"]["enabled"]
++            or config["train_micro_batch_size"] != 1
++            or config["logprob_batch_size"] != 1):
++        raise ValueError("Local forward padding requires TP1/CP1, unreplicated FSDP, unpacked fixed microbatch size 1")
++    if not dtensor.get("linear_logprob_chunk_size"):
++        raise ValueError("Local forward padding requires the verified linear-logprob path")
+--- a/nemo_rl/models/automodel/setup.py
++++ b/nemo_rl/models/automodel/setup.py
+@@ -370,6 +370,10 @@
+         **hf_config_overrides,
+     )
+ 
++    from nemo_rl.models.automodel.linear_logprobs import validate_projection_config
++
++    validate_projection_config(config, sampling_params, model_config.model_type)
++
+     # Check if model supports flash attention args
+     allow_flash_attn_args = True
+     if (
+--- a/nemo_rl/models/automodel/train.py
++++ b/nemo_rl/models/automodel/train.py
+@@ -337,6 +337,44 @@
+             "ScorePostProcessor does not support context_parallel_size > 1 "
+             "on the automodel backend. Set context_parallel_size=1."
+         )
++
++    dtensor_config = post_processing_fn.cfg.get("dtensor_cfg")
++    linear_chunk = dtensor_config.get("linear_logprob_chunk_size") if dtensor_config is not None else None
++    if linear_chunk is not None:
++        from nemo_rl.models.automodel.linear_logprobs import model_next_token_logprobs
++
++        if not isinstance(post_processing_fn, (LogprobsPostProcessor, LossPostProcessor)):
++            raise ValueError("This post-processor requires full vocabulary logits")
++        if prepared.cp_size != 1 or post_processing_fn.enable_seq_packing:
++            raise ValueError("Linear logprobs require CP1 and unpacked sequences")
++        if isinstance(post_processing_fn, LossPostProcessor) and post_processing_fn.loss_fn.input_type != LossInputType.LOGPROB:
++            raise ValueError("Linear projection requires a sampled-token logprob loss")
++        # Offload only tensors autograd saves; checkpoint recomputation, FSDP
++        # parameter ownership, token content and loss normalization stay native.
++        activation_context = (
++            torch.autograd.graph.save_on_cpu(
++                pin_memory=dtensor_config.get("activation_cpu_offload_pin_memory", True)
++            )
++            if torch.is_grad_enabled() and dtensor_config.get("activation_cpu_offload")
++            else nullcontext()
++        )
++        with activation_context:
++            next_logprobs = model_next_token_logprobs(
++                model, prepared.model_batch, processed_inputs.input_ids,
++                chunk_size=linear_chunk, sampling_params=sampling_params,
++            )
++        if isinstance(post_processing_fn, LossPostProcessor):
++            result, metrics = post_processing_fn.loss_fn(
++                next_token_logprobs=next_logprobs, data=data_dict,
++                global_valid_seqs=global_valid_seqs, global_valid_toks=global_valid_toks,
++            )
++        else:
++            token_logprobs = torch.cat([torch.zeros_like(next_logprobs[:, :1]), next_logprobs], dim=1)
++            lengths = data_dict["input_lengths"].to(token_logprobs.device)
++            valid_positions = torch.arange(token_logprobs.shape[1], device=token_logprobs.device)[None, :] < lengths[:, None]
++            result = token_logprobs * valid_positions
++            metrics = {"logprobs": result}
++        return result, metrics, processed_mb
+ 
+     # Model forward pass
+     outputs = model_forward(model, prepared.model_batch)
+--- a/nemo_rl/models/policy/__init__.py
++++ b/nemo_rl/models/policy/__init__.py
+@@ -190,6 +190,7 @@
+ class AutomodelCheckpointConfig(TypedDict, total=False):
+     """Automodel checkpoint settings used by DTensor v2."""
+ 
++    synchronous: bool
+     model_save_format: Literal["torch_save", "safetensors"] | None
+     save_consolidated: Literal["false", "final", "every"]
+     single_rank_consolidation: bool
+@@ -217,6 +218,14 @@
+     # Model config
+     lora_cfg: NotRequired[LoRAConfig | LoRAConfigDisabled]
+     automodel_kwargs: NotRequired[AutomodelKwargs]
++    # Positive sequence chunk for bounded LM-head projection; null/absent disables.
++    # Currently Nemotron Omni, TP1/CP1, unpacked sampled-token logprob losses only.
++    linear_logprob_chunk_size: NotRequired[int | None]
++    # Save checkpoint inputs/head tensors to host memory; requires the linear path.
++    activation_cpu_offload: NotRequired[bool | None]
++    activation_cpu_offload_pin_memory: NotRequired[bool]
++    # Materialize local DP lengths; optional, disabled unless explicitly true.
++    local_forward_padding: NotRequired[bool | None]
+     # Runtime
+     clear_cache_every_n_steps: NotRequired[int | None]
+     checkpoint: NotRequired[AutomodelCheckpointConfig]
+--- a/nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py
++++ b/nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py
+@@ -35,6 +35,7 @@
+ from nemo_rl.algorithms.logits_sampling_utils import TrainingSamplingParams
+ from nemo_rl.algorithms.loss.interfaces import LossFunction
+ from nemo_rl.algorithms.metric_utils import LEARNING_RATE_KEY
++from nemo_rl.data_plane.interfaces import KVBatchMeta
+ from nemo_rl.data_plane.worker_mixin import TQWorkerMixin
+ from nemo_rl.data_plane.schema import DP_PADDING_TAG
+ from nemo_rl.distributed.batched_data_dict import BatchedDataDict
+@@ -220,6 +221,15 @@
+         else:
+             return f"{self.__class__.__qualname__}"
+ 
++    def _forward_pad_seqlen(self, meta: "KVBatchMeta") -> int:
++        """Optionally materialize only this DP rank's actual sequence lengths."""
++        if self.cfg["dtensor_cfg"].get("local_forward_padding"):
++            # Rejected rollouts have one masked pad token. Keep a second
++            # forward-only pad position so next-token projection is defined.
++            # Stored tokens, logical lengths and loss masks stay unchanged.
++            return 2
++        return super()._forward_pad_seqlen(meta)
++
+     def _get_replica_group(self) -> Optional[Any]:
+         """Replica group = flattened (cp, tp) sub-mesh — see V1 worker."""
+         return self.device_mesh[("cp", "tp")]._flatten().get_group()
+@@ -257,6 +267,9 @@
+         init_telemetry_worker()
+ 
+         # Store configuration
++        from nemo_rl.models.automodel.local_padding import validate_local_padding_config
++
++        validate_local_padding_config(config)
+         self.cfg = config
+         self._buffered_train_step: Optional[BufferedTrainStep] = None
+ 
+@@ -322,6 +335,10 @@
+             getattr(runtime_config.model_config, "model_type", None) == "deepseek_v4"
+         )
+         dtensor_cfg = config["dtensor_cfg"]
++        synchronous_checkpoint = dtensor_cfg["checkpoint"].get("synchronous", False)
++        if type(synchronous_checkpoint) is not bool:
++            raise ValueError("dtensor_cfg.checkpoint.synchronous must be boolean")
++        requires_synchronous_checkpoint |= synchronous_checkpoint
+         checkpoint_config = build_checkpoint_config(
+             dtensor_cfg,
+             model_repo_id=config["model_name"],
+--- a/tests/unit/reference_configs/grpo_math_1B.yaml
++++ b/tests/unit/reference_configs/grpo_math_1B.yaml
+@@ -155,6 +155,12 @@
+   worker_extension_cls_fqn: null
+ 
+   dtensor_cfg:
++    # Optional bounded LM-head projection for Nemotron Omni; null keeps the standard path.
++    linear_logprob_chunk_size: null
++    # Optional host activation storage for long-context linear-logprob training.
++    activation_cpu_offload: false
++    # Opt-in per-DP lengths; TP1/CP1, fixed microbatch 1 only.
++    local_forward_padding: false
+     enabled: true
+     checkpoint:
+       model_save_format: "safetensors"

@@ -1,0 +1,98 @@
+{
+  "description": "Integrated native runtime after automodel-captured-images. Includes continuous ready-first admission, restart-safe length reward, failure masks, checkpoint recovery and bounded-memory training. Replaces optional linear-logprob/local-padding/process-return/media-custody patches for this profile.",
+  "files": {
+    "examples/configs/grpo_math_1B.yaml": {
+      "before_sha256": "89f3c965899c52780b72d933310064c52c64a4aac7624b1e7a28439c13426959",
+      "after_sha256": "733c6d386191b76832677036777a104c3354e60f7550433720aa3be7b0af4d22"
+    },
+    "examples/configs/grpo_math_1B_megatron_single_controller.yaml": {
+      "before_sha256": "64d498370115ed3106916232017aa0b86786e2c95bd09086327c78914232fd62",
+      "after_sha256": "79319d72125461793090828880f8bbe9d20faca29290afc595f2116263d9b3aa"
+    },
+    "nemo_rl/algorithms/async_utils/staleness_sampler.py": {
+      "before_sha256": "c5cb48c300b0888d79c7dc6edc77ab18827ff8e4ef4e2314c1eec1bd7aacd8fe",
+      "after_sha256": "40a43bb3f7b93ebe2a3c5863a239a8cdd398605d23497f5f179d2dbfaf7254c7"
+    },
+    "nemo_rl/algorithms/grpo.py": {
+      "before_sha256": "101c32a6be20faae81434f2743b7a483dc17099989a3be07fdf9dd99303e36c9",
+      "after_sha256": "a93c00db8b38b603b2d2b177dcb80120f879e2ccf3cfc0af7e904399ba0662ea"
+    },
+    "nemo_rl/algorithms/length_penalty.py": {
+      "before_sha256": null,
+      "after_sha256": "7954bf3e14fbcc088c416e3de476a4882da6d6b104e38b41d7d0cc97ab7e427d"
+    },
+    "nemo_rl/algorithms/single_controller.py": {
+      "before_sha256": "4b4ec49855bf8127c17388bbe37b459c00665d2dc639170b2ccada5426e682a6",
+      "after_sha256": "b86aeee73c1c12f338470f5dcf65e008a8085f7abee1e9032b3db87ff8b715ae"
+    },
+    "nemo_rl/algorithms/single_controller_utils/advantage_stage.py": {
+      "before_sha256": "2d70570037c3c181093cc1529d432797e13443e5d51d4692a7efb827518fae20",
+      "after_sha256": "ba17e771474a1992b166f50c383fa4d3e18239730aa38345ea18cd909ead4310"
+    },
+    "nemo_rl/algorithms/single_controller_utils/config.py": {
+      "before_sha256": "edc78fb099013cbc26c40cc6aa1bed17e4efed978ddb623b1a1a898056755ac8",
+      "after_sha256": "d5f46c5597672877af4164fc9c9b7a7703609fdbb46ad5f13b6799ad139ce188"
+    },
+    "nemo_rl/algorithms/single_controller_utils/setup.py": {
+      "before_sha256": "06709ca2b54b5332e338d4f2b0feb0705561c66d135c23d262ea3220b404f3c1",
+      "after_sha256": "a3a54a9928c8ea4da6c004ffd479241e2f78f90cdbf5dc5305ae849d011f863a"
+    },
+    "nemo_rl/algorithms/single_controller_utils/utils.py": {
+      "before_sha256": "7cd2d2da55e3baa7bf3eb4ce23b85c6e0a9809bbe1024f229b83334e8e1d1aaa",
+      "after_sha256": "56f344306bcf5166d5f85aa75233d38cfa5796db078727ae7b5746f029a17dd4"
+    },
+    "nemo_rl/data_plane/column_io.py": {
+      "before_sha256": "2ed8af38c64d256f381da126d0aed7f69e6ad1a05ed3344e2bca8fdbbf02d30d",
+      "after_sha256": "54ab3d190a747c8e9b91eb402504ecf6da86401c6811943ba3460eb0ed89e2f4"
+    },
+    "nemo_rl/data_plane/schema.py": {
+      "before_sha256": "630da9df4e53dcf31f4e821ce11b0e933ae86a35d32a64250fe925d3fd0b5f07",
+      "after_sha256": "c0f68751806e8ea01a8cccbe83b10d3eca91277de0ba98cdb608b64e8613a428"
+    },
+    "nemo_rl/environments/nemo_gym.py": {
+      "before_sha256": "bc18e626f0453aba7be3534a5914770310ca0bc8ed6444383843a87c14c54c6e",
+      "after_sha256": "6f83b0a75cef58f0017c20a1a0a3b8ab0550ac4f56f983058cb1825bb550641a"
+    },
+    "nemo_rl/experience/process_returns.py": {
+      "before_sha256": null,
+      "after_sha256": "78d65f3924ef8bb22b4ec574934cb911f1524fa4dc5795251a7de72c3aea3c87"
+    },
+    "nemo_rl/experience/rollout_reassembler.py": {
+      "before_sha256": "0bc8cc0162d5dec14447807eeb7c22228f9396212267eac4f96f266d16bbab1d",
+      "after_sha256": "565841eecfe486626b1607f017634dedecc748dc9a4c6db1c88490c0b7b39e7e"
+    },
+    "nemo_rl/experience/rollout_reassembler_actor.py": {
+      "before_sha256": "7f23986d1cb0890065e00a1652a5a0dd4bf64c75906f7843338de7414f9f6f06",
+      "after_sha256": "6f8171e4085979335e65c28596a94d76b2a6e9de5f3bcfe26b341b20f3c4df95"
+    },
+    "nemo_rl/models/automodel/linear_logprobs.py": {
+      "before_sha256": null,
+      "after_sha256": "e7bd3fade9eddb02004c0ebb416affa646720656f7190e272e8cd77e283f0669"
+    },
+    "nemo_rl/models/automodel/local_padding.py": {
+      "before_sha256": null,
+      "after_sha256": "9cb519a8c9a59dcd8ec66b80cfe886230fba7843f9ffc37ea6355b444485d81b"
+    },
+    "nemo_rl/models/automodel/setup.py": {
+      "before_sha256": "cedc52e94b90c9f27686aa49d4e5dedb450e4ee2d73569d6f3f636497c9f0f23",
+      "after_sha256": "effbef0105b77837fa187602ee1b2a424d97774dbb41f0eb8a9f9c3db65a8a15"
+    },
+    "nemo_rl/models/automodel/train.py": {
+      "before_sha256": "f91aa0c3d106b21d61e6a6ea83907b17e27b4a3ad264c9c2f5b027cc160dc256",
+      "after_sha256": "b76789a89d9e1f34e7a34bda6ae0f0a651571b2b4191cd26901dc78a17c03760"
+    },
+    "nemo_rl/models/policy/__init__.py": {
+      "before_sha256": "dfa7207c00455d2b060f68e25efb848b4b8bc1e02b0e0d20e9bec6825fb5e921",
+      "after_sha256": "0fb42576d17efe7cb119025aa78e1024c593550c552d17f790a3aaed9cbaa4bd"
+    },
+    "nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py": {
+      "before_sha256": "18fa25b8ca2a57c0a9958166c9f93045e6182dbc49189f50eaadaaeecf711379",
+      "after_sha256": "66e485f00676338a98194300e0d07047d13437a7e5552ec9824a3ae623d5d7bc"
+    },
+    "tests/unit/reference_configs/grpo_math_1B.yaml": {
+      "before_sha256": "44966883b7d7e6ce7290e253a5e24f1bea9c8be6470b6b2fac1e2b279c72c502",
+      "after_sha256": "1ab3dcc6c4366b2583002147f716dcbeab1c78fdb007bbaec1ab41343e320608"
+    }
+  },
+  "patch_sha256": "99b30311e812c4e60ad044129ae9e3a39b3490bd521e7b1716f285c7cb3f58d8"
+}

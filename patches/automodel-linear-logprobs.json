@@ -1,0 +1,30 @@
+{
+  "description": "Optional selected-token projection and opt-in native saved-activation CPU storage. Preserves full sequences, vocabulary, parameter ownership and loss. Capture patch prerequisite. Full Super update acceptance pending.",
+  "patch_sha256": "7b07708ada1b48618683f28de10cfcc3732f14ed143d7822f46a37ddd9a55f46",
+  "files": {
+    "examples/configs/grpo_math_1B.yaml": {
+      "before_sha256": "89f3c965899c52780b72d933310064c52c64a4aac7624b1e7a28439c13426959",
+      "after_sha256": "e5dd9026e732cb0209fc43e77d7fcb8441e0f9898d1d5bc9cc34bd9dd8019847"
+    },
+    "nemo_rl/models/automodel/linear_logprobs.py": {
+      "before_sha256": null,
+      "after_sha256": "f0b57920a936b360953983d0fa89c261634b3accbe10d4512c6dcd6be7377500"
+    },
+    "nemo_rl/models/automodel/setup.py": {
+      "before_sha256": "cedc52e94b90c9f27686aa49d4e5dedb450e4ee2d73569d6f3f636497c9f0f23",
+      "after_sha256": "effbef0105b77837fa187602ee1b2a424d97774dbb41f0eb8a9f9c3db65a8a15"
+    },
+    "nemo_rl/models/automodel/train.py": {
+      "before_sha256": "f91aa0c3d106b21d61e6a6ea83907b17e27b4a3ad264c9c2f5b027cc160dc256",
+      "after_sha256": "a2ea0beececfe37fc1beb81de771c8bd8bd420be37f9882511548f9ca8e51682"
+    },
+    "nemo_rl/models/policy/__init__.py": {
+      "before_sha256": "dfa7207c00455d2b060f68e25efb848b4b8bc1e02b0e0d20e9bec6825fb5e921",
+      "after_sha256": "d5e3f50dc56f0f84031d90530e6fa9c30ad9f93a1626c7fc8b5c879abd0d598b"
+    },
+    "tests/unit/reference_configs/grpo_math_1B.yaml": {
+      "before_sha256": "44966883b7d7e6ce7290e253a5e24f1bea9c8be6470b6b2fac1e2b279c72c502",
+      "after_sha256": "57241eec4e1c24c5162d0522957e363029d6b83b04e79186a2240fc6e7194379"
+    }
+  }
+}

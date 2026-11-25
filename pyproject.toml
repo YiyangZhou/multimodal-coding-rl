@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multimodal-coding-rl"
+version = "0.1.0"
+description = "Multimodal coding environments and mixed harness rollouts for NeMo RL."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8", "Pillow>=10", "numpy>=1.26", "datasets==3.6.0", "pyarrow==20.0.0"]
+
+[project.scripts]
+mmrl = "mmrl.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mmrl*"]
+
+[tool.setuptools.package-data]
+mmrl = ["*.json"]

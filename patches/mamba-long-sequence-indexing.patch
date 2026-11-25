@@ -1,0 +1,434 @@
+--- a/ssd_chunk_state.py
++++ b/ssd_chunk_state.py
+@@ -54,9 +54,9 @@
+     HAS_DT_BIAS: tl.constexpr,
+     BLOCK_SIZE_H: tl.constexpr, BLOCK_SIZE_CHUNK: tl.constexpr,
+ ):
+-    pid_b = tl.program_id(axis=0)
+-    pid_c = tl.program_id(axis=1)
+-    pid_h = tl.program_id(axis=2)
++    pid_b = tl.program_id(axis=0).to(tl.int64)
++    pid_c = tl.program_id(axis=1).to(tl.int64)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
+     dt_ptr += pid_b * stride_dt_batch + pid_c * chunk_size * stride_dt_seqlen
+     dt_out_ptr += pid_b * stride_dt_out_batch + pid_c * stride_dt_out_chunk
+     dA_cumsum_ptr += pid_b * stride_dA_cs_batch + pid_c * stride_dA_cs_chunk
+@@ -121,9 +121,9 @@
+     BLOCK_SIZE_H: tl.constexpr, BLOCK_SIZE_CHUNK: tl.constexpr,
+     DETERMINISTIC_REDUCTION: tl.constexpr,
+ ):
+-    pid_b = tl.program_id(axis=0)
+-    pid_c = tl.program_id(axis=1)
+-    pid_h = tl.program_id(axis=2)
++    pid_b = tl.program_id(axis=0).to(tl.int64)
++    pid_c = tl.program_id(axis=1).to(tl.int64)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
+     ddt_out_ptr += pid_b * stride_ddt_out_batch + pid_c * stride_ddt_out_chunk
+     ddA_ptr += pid_b * stride_ddA_batch + pid_c * stride_ddA_chunk
+     dt_ptr += pid_b * stride_dt_batch + pid_c * chunk_size * stride_dt_seqlen
+@@ -206,13 +206,13 @@
+     HAS_SEQ_IDX: tl.constexpr,
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
+ ):
+-    pid_bc = tl.program_id(axis=1)
++    pid_bc = tl.program_id(axis=1).to(tl.int64)
+     pid_c = pid_bc // batch
+     pid_b = pid_bc - pid_c * batch
+-    pid_h = tl.program_id(axis=2)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
+     num_pid_n = tl.cdiv(dstate, BLOCK_SIZE_N)
+-    pid_m = tl.program_id(axis=0) // num_pid_n
+-    pid_n = tl.program_id(axis=0) % num_pid_n
++    pid_m = tl.program_id(axis=0).to(tl.int64) // num_pid_n
++    pid_n = tl.program_id(axis=0).to(tl.int64) % num_pid_n
+     b_ptr += pid_b * stride_b_batch + pid_c * chunk_size * stride_b_seqlen + (pid_h // nheads_ngroups_ratio) * stride_b_head
+     x_ptr += pid_b * stride_x_batch + pid_c * chunk_size * stride_x_seqlen + pid_h * stride_x_head
+     dt_ptr += pid_b * stride_dt_batch + pid_c * stride_dt_chunk + pid_h * stride_dt_head
+@@ -304,13 +304,13 @@
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
+     BLOCK_SIZE_DSTATE: tl.constexpr,
+ ):
+-    pid_bc = tl.program_id(axis=1)
++    pid_bc = tl.program_id(axis=1).to(tl.int64)
+     pid_c = pid_bc // batch
+     pid_b = pid_bc - pid_c * batch
+-    pid_h = tl.program_id(axis=2)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
+     num_pid_n = tl.cdiv(hdim, BLOCK_SIZE_N)
+-    pid_m = tl.program_id(axis=0) // num_pid_n
+-    pid_n = tl.program_id(axis=0) % num_pid_n
++    pid_m = tl.program_id(axis=0).to(tl.int64) // num_pid_n
++    pid_n = tl.program_id(axis=0).to(tl.int64) % num_pid_n
+     x_ptr += pid_b * stride_x_batch + pid_c * chunk_size * stride_x_seqlen + pid_h * stride_x_head
+     b_ptr += pid_b * stride_b_batch + pid_c * chunk_size * stride_b_seqlen + (pid_h // nheads_ngroups_ratio) * stride_b_head
+     dstates_ptr += pid_b * stride_dstates_batch + pid_c * stride_dstates_chunk + pid_h * stride_states_head
+@@ -417,15 +417,15 @@
+     DETERMINISTIC_REDUCTION: tl.constexpr,
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
+ ):
+-    pid_bc = tl.program_id(axis=1)
++    pid_bc = tl.program_id(axis=1).to(tl.int64)
+     pid_c = pid_bc // batch
+     pid_b = pid_bc - pid_c * batch
+-    pid_sg = tl.program_id(axis=2)
++    pid_sg = tl.program_id(axis=2).to(tl.int64)
+     pid_s = pid_sg // ngroups
+     pid_g = pid_sg - pid_s * ngroups
+     num_pid_n = tl.cdiv(dstate, BLOCK_SIZE_N)
+-    pid_m = tl.program_id(axis=0) // num_pid_n
+-    pid_n = tl.program_id(axis=0) % num_pid_n
++    pid_m = tl.program_id(axis=0).to(tl.int64) // num_pid_n
++    pid_n = tl.program_id(axis=0).to(tl.int64) % num_pid_n
+     x_ptr += pid_b * stride_x_batch + pid_c * chunk_size * stride_x_seqlen + (pid_g * (nheads // ngroups) + pid_s * nheads_per_program) * stride_x_head
+     db_ptr += pid_b * stride_db_batch + pid_c * chunk_size * stride_db_seqlen + pid_g * stride_db_group + pid_s * stride_db_split
+     dstates_ptr += pid_b * stride_dstates_batch + pid_c * stride_dstates_chunk + (pid_g * (nheads // ngroups) + pid_s * nheads_per_program) * stride_states_head
+@@ -546,13 +546,13 @@
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
+     BLOCK_SIZE_DSTATE: tl.constexpr,
+ ):
+-    pid_bc = tl.program_id(axis=1)
++    pid_bc = tl.program_id(axis=1).to(tl.int64)
+     pid_c = pid_bc // batch
+     pid_b = pid_bc - pid_c * batch
+-    pid_h = tl.program_id(axis=2)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
+     num_pid_n = tl.cdiv(hdim, BLOCK_SIZE_N)
+-    pid_m = tl.program_id(axis=0) // num_pid_n
+-    pid_n = tl.program_id(axis=0) % num_pid_n
++    pid_m = tl.program_id(axis=0).to(tl.int64) // num_pid_n
++    pid_n = tl.program_id(axis=0).to(tl.int64) % num_pid_n
+     x_ptr += pid_b * stride_x_batch + pid_c * chunk_size * stride_x_seqlen + pid_h * stride_x_head
+     b_ptr += pid_b * stride_b_batch + pid_c * chunk_size * stride_b_seqlen + (pid_h // nheads_ngroups_ratio) * stride_b_head
+     dstates_ptr += pid_b * stride_dstates_batch + pid_c * stride_dstates_chunk + pid_h * stride_states_head
+@@ -653,11 +653,11 @@
+     # Meta-parameters
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
+ ):
+-    pid_b = tl.program_id(axis=1)
+-    pid_h = tl.program_id(axis=2)
++    pid_b = tl.program_id(axis=1).to(tl.int64)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
+     num_pid_n = tl.cdiv(dstate, BLOCK_SIZE_N)
+-    pid_m = tl.program_id(axis=0) // num_pid_n
+-    pid_n = tl.program_id(axis=0) % num_pid_n
++    pid_m = tl.program_id(axis=0).to(tl.int64) // num_pid_n
++    pid_n = tl.program_id(axis=0).to(tl.int64) % num_pid_n
+     end_idx = tl.load(cu_seqlens_ptr + pid_b + 1)
+     pid_c = (end_idx - 1) // chunk_size
+     b_ptr += pid_c * chunk_size * stride_b_seqlen + (pid_h // nheads_ngroups_ratio) * stride_b_head
+--- a/ssd_chunk_scan.py
++++ b/ssd_chunk_scan.py
+@@ -73,13 +73,13 @@
+     BLOCK_SIZE_DSTATE: tl.constexpr,
+     IS_TRITON_22: tl.constexpr,
+ ):
+-    pid_bc = tl.program_id(axis=1)
++    pid_bc = tl.program_id(axis=1).to(tl.int64)
+     pid_c = pid_bc // batch
+     pid_b = pid_bc - pid_c * batch
+-    pid_h = tl.program_id(axis=2)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
+     num_pid_n = tl.cdiv(hdim, BLOCK_SIZE_N)
+-    pid_m = tl.program_id(axis=0) // num_pid_n
+-    pid_n = tl.program_id(axis=0) % num_pid_n
++    pid_m = tl.program_id(axis=0).to(tl.int64) // num_pid_n
++    pid_n = tl.program_id(axis=0).to(tl.int64) % num_pid_n
+     cb_ptr += pid_b * stride_cb_batch + pid_c * stride_cb_chunk + (pid_h // nheads_ngroups_ratio) * stride_cb_head
+     x_ptr += pid_b * stride_x_batch + pid_c * chunk_size * stride_x_seqlen + pid_h * stride_x_head
+     dt_ptr += pid_b * stride_dt_batch + pid_c * stride_dt_chunk + pid_h * stride_dt_head
+@@ -218,11 +218,11 @@
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr,
+     BLOCK_SIZE_DSTATE: tl.constexpr,
+ ):
+-    pid_bc = tl.program_id(axis=1)
++    pid_bc = tl.program_id(axis=1).to(tl.int64)
+     pid_c = pid_bc // batch
+     pid_b = pid_bc - pid_c * batch
+-    pid_h = tl.program_id(axis=2)
+-    pid_n = tl.program_id(axis=0)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
++    pid_n = tl.program_id(axis=0).to(tl.int64)
+     cb_ptr += pid_b * stride_cb_batch + pid_c * stride_cb_chunk + (pid_h // nheads_ngroups_ratio) * stride_cb_head
+     x_ptr += pid_b * stride_x_batch + pid_c * chunk_size * stride_x_seqlen + pid_h * stride_x_head
+     dt_ptr += pid_b * stride_dt_batch + pid_c * stride_dt_chunk + pid_h * stride_dt_head
+@@ -370,11 +370,11 @@
+     RECOMPUTE_OUTPUT: tl.constexpr,
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr,
+ ):
+-    pid_bc = tl.program_id(axis=1)
++    pid_bc = tl.program_id(axis=1).to(tl.int64)
+     pid_c = pid_bc // batch
+     pid_b = pid_bc - pid_c * batch
+-    pid_h = tl.program_id(axis=2)
+-    pid_m = tl.program_id(axis=0)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
++    pid_m = tl.program_id(axis=0).to(tl.int64)
+
+     dout_ptr += pid_b * stride_dout_batch + pid_c * chunk_size * stride_dout_seqlen + pid_h * stride_dout_head
+     dout_x_ptr += pid_b * stride_doutx_batch + pid_c * chunk_size * stride_doutx_seqlen + pid_h * stride_doutx_head
+@@ -462,13 +462,13 @@
+     HAS_SEQ_IDX: tl.constexpr,
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
+ ):
+-    pid_bc = tl.program_id(axis=1)
++    pid_bc = tl.program_id(axis=1).to(tl.int64)
+     pid_c = pid_bc // batch
+     pid_b = pid_bc - pid_c * batch
+-    pid_h = tl.program_id(axis=2)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
+     num_pid_n = tl.cdiv(dstate, BLOCK_SIZE_N)
+-    pid_m = tl.program_id(axis=0) // num_pid_n
+-    pid_n = tl.program_id(axis=0) % num_pid_n
++    pid_m = tl.program_id(axis=0).to(tl.int64) // num_pid_n
++    pid_n = tl.program_id(axis=0).to(tl.int64) % num_pid_n
+     c_ptr += pid_b * stride_c_batch + pid_c * chunk_size * stride_c_seqlen + (pid_h // nheads_ngroups_ratio) * stride_c_head
+     dout_ptr += pid_b * stride_dout_batch + pid_c * chunk_size * stride_dout_seqlen + pid_h * stride_dout_head
+     dA_cumsum_ptr += pid_b * stride_dA_cs_batch + pid_c * stride_dA_cs_chunk + pid_h * stride_dA_cs_head
+@@ -548,15 +548,15 @@
+     DETERMINISTIC_REDUCTION: tl.constexpr,
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
+ ):
+-    pid_bc = tl.program_id(axis=1)
++    pid_bc = tl.program_id(axis=1).to(tl.int64)
+     pid_c = pid_bc // batch
+     pid_b = pid_bc - pid_c * batch
+-    pid_sg = tl.program_id(axis=2)
++    pid_sg = tl.program_id(axis=2).to(tl.int64)
+     pid_s = pid_sg // ngroups
+     pid_g = pid_sg - pid_s * ngroups
+     num_pid_n = tl.cdiv(dstate, BLOCK_SIZE_N)
+-    pid_m = tl.program_id(axis=0) // num_pid_n
+-    pid_n = tl.program_id(axis=0) % num_pid_n
++    pid_m = tl.program_id(axis=0).to(tl.int64) // num_pid_n
++    pid_n = tl.program_id(axis=0).to(tl.int64) % num_pid_n
+     dout_ptr += pid_b * stride_dout_batch + pid_c * chunk_size * stride_dout_seqlen + (pid_g * (nheads // ngroups) + pid_s * nheads_per_program) * stride_dout_head
+     dc_ptr += pid_b * stride_dc_batch + pid_c * chunk_size * stride_dc_seqlen + pid_g * stride_dc_group + pid_s * stride_dc_split
+     prev_states_ptr += pid_b * stride_prev_states_batch + pid_c * stride_prev_states_chunk + (pid_g * (nheads // ngroups) + pid_s * nheads_per_program) * stride_prev_states_head
+@@ -661,13 +661,13 @@
+     DETERMINISTIC_REDUCTION: tl.constexpr,
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
+ ):
+-    pid_bc = tl.program_id(axis=1)
++    pid_bc = tl.program_id(axis=1).to(tl.int64)
+     pid_c = pid_bc // batch
+     pid_b = pid_bc - pid_c * batch
+-    pid_h = tl.program_id(axis=2)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
+     num_pid_n = tl.cdiv(hdim, BLOCK_SIZE_N)
+-    pid_m = tl.program_id(axis=0) // num_pid_n
+-    pid_n = tl.program_id(axis=0) % num_pid_n
++    pid_m = tl.program_id(axis=0).to(tl.int64) // num_pid_n
++    pid_n = tl.program_id(axis=0).to(tl.int64) % num_pid_n
+     x_ptr += pid_b * stride_x_batch + pid_c * chunk_size * stride_x_seqlen + pid_h * stride_x_head
+     cb_ptr += pid_b * stride_cb_batch + pid_c * stride_cb_chunk + (pid_h // nheads_ngroups_ratio) * stride_cb_head
+     dout_ptr += pid_b * stride_dout_batch + pid_c * chunk_size * stride_dout_seqlen + pid_h * stride_dout_head
+@@ -792,15 +792,15 @@
+     HAS_SEQ_IDX: tl.constexpr,
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
+ ):
+-    pid_bc = tl.program_id(axis=1)
++    pid_bc = tl.program_id(axis=1).to(tl.int64)
+     pid_c = pid_bc // batch
+     pid_b = pid_bc - pid_c * batch
+-    pid_sg = tl.program_id(axis=2)
++    pid_sg = tl.program_id(axis=2).to(tl.int64)
+     pid_s = pid_sg // ngroups
+     pid_g = pid_sg - pid_s * ngroups
+     num_pid_n = tl.cdiv(chunk_size, BLOCK_SIZE_N)
+-    pid_m = tl.program_id(axis=0) // num_pid_n
+-    pid_n = tl.program_id(axis=0) % num_pid_n
++    pid_m = tl.program_id(axis=0).to(tl.int64) // num_pid_n
++    pid_n = tl.program_id(axis=0).to(tl.int64) % num_pid_n
+
+     x_ptr += pid_b * stride_x_batch + pid_c * chunk_size * stride_x_seqlen + (pid_g * (nheads // ngroups) + pid_s * nheads_per_program) * stride_x_head
+     dout_ptr += pid_b * stride_dout_batch + pid_c * chunk_size * stride_dout_seqlen + (pid_g * (nheads // ngroups) + pid_s * nheads_per_program) * stride_dout_head
+@@ -908,11 +908,11 @@
+     SUBTRACT_DDTDT: tl.constexpr,
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr,
+ ):
+-    pid_bc = tl.program_id(axis=1)
++    pid_bc = tl.program_id(axis=1).to(tl.int64)
+     pid_c = pid_bc // batch
+     pid_b = pid_bc - pid_c * batch
+-    pid_h = tl.program_id(axis=2)
+-    pid_m = tl.program_id(axis=0)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
++    pid_m = tl.program_id(axis=0).to(tl.int64)
+
+     dout_ptr += pid_b * stride_dout_batch + pid_c * chunk_size * stride_dout_seqlen + pid_h * stride_dout_head
+     out_ptr += pid_b * stride_out_batch + pid_c * chunk_size * stride_out_seqlen + pid_h * stride_out_head
+@@ -993,13 +993,13 @@
+     # Meta-parameters
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
+ ):
+-    pid_bc = tl.program_id(axis=1)
++    pid_bc = tl.program_id(axis=1).to(tl.int64)
+     pid_c = pid_bc // batch
+     pid_b = pid_bc - pid_c * batch
+-    pid_h = tl.program_id(axis=2)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
+     num_pid_n = tl.cdiv(chunk_size, BLOCK_SIZE_N)
+-    pid_m = tl.program_id(axis=0) // num_pid_n
+-    pid_n = tl.program_id(axis=0) % num_pid_n
++    pid_m = tl.program_id(axis=0).to(tl.int64) // num_pid_n
++    pid_n = tl.program_id(axis=0).to(tl.int64) % num_pid_n
+
+     x_ptr += pid_b * stride_x_batch + pid_c * chunk_size * stride_x_seqlen + pid_h * stride_x_head
+     dout_ptr += pid_b * stride_dout_batch + pid_c * chunk_size * stride_dout_seqlen + pid_h * stride_dout_head
+@@ -1112,11 +1112,11 @@
+     # Meta-parameters
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
+ ):
+-    pid_bc = tl.program_id(axis=1)
++    pid_bc = tl.program_id(axis=1).to(tl.int64)
+     pid_c = pid_bc // batch
+     pid_b = pid_bc - pid_c * batch
+-    pid_h = tl.program_id(axis=2)
+-    pid_m = tl.program_id(axis=0)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
++    pid_m = tl.program_id(axis=0).to(tl.int64)
+
+     x_ptr += pid_b * stride_x_batch + pid_c * chunk_size * stride_x_seqlen + pid_h * stride_x_head
+     dout_ptr += pid_b * stride_dout_batch + pid_c * chunk_size * stride_dout_seqlen + pid_h * stride_dout_head
+@@ -1213,13 +1213,13 @@
+     HAS_SEQ_IDX: tl.constexpr,
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
+ ):
+-    pid_bc = tl.program_id(axis=1)
++    pid_bc = tl.program_id(axis=1).to(tl.int64)
+     pid_c = pid_bc // batch
+     pid_b = pid_bc - pid_c * batch
+-    pid_h = tl.program_id(axis=2)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
+     num_pid_n = tl.cdiv(dstate, BLOCK_SIZE_N)
+-    pid_m = tl.program_id(axis=0) // num_pid_n
+-    pid_n = tl.program_id(axis=0) % num_pid_n
++    pid_m = tl.program_id(axis=0).to(tl.int64) // num_pid_n
++    pid_n = tl.program_id(axis=0).to(tl.int64) % num_pid_n
+     dout_ptr += pid_b * stride_dout_batch + pid_c * chunk_size * stride_dout_seqlen + pid_h * stride_dout_head
+     prev_states_ptr += pid_b * stride_prev_states_batch + pid_c * stride_prev_states_chunk + pid_h * stride_prev_states_head
+     C_ptr += pid_b * stride_C_batch + pid_c * chunk_size * stride_C_seqlen + (pid_h // nheads_ngroups_ratio) * stride_C_head
+--- a/ssd_state_passing.py
++++ b/ssd_state_passing.py
+@@ -44,9 +44,9 @@
+     HAS_SEQ_IDX: tl.constexpr,
+     BLOCK_SIZE: tl.constexpr,
+ ):
+-    pid_b = tl.program_id(axis=1)
+-    pid_h = tl.program_id(axis=2)
+-    pid_m = tl.program_id(axis=0)
++    pid_b = tl.program_id(axis=1).to(tl.int64)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
++    pid_m = tl.program_id(axis=0).to(tl.int64)
+     states_ptr += pid_b * stride_states_batch + pid_h * stride_states_head
+     dA_cs_ptr += pid_b * stride_dA_cs_batch + pid_h * stride_dA_cs_head
+     out_ptr += pid_b * stride_out_batch + pid_h * stride_out_head
+@@ -121,9 +121,9 @@
+     HAS_SEQ_IDX: tl.constexpr,
+     BLOCK_SIZE: tl.constexpr,
+ ):
+-    pid_b = tl.program_id(axis=1)
+-    pid_h = tl.program_id(axis=2)
+-    pid_m = tl.program_id(axis=0)
++    pid_b = tl.program_id(axis=1).to(tl.int64)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
++    pid_m = tl.program_id(axis=0).to(tl.int64)
+     dstates_ptr += pid_b * stride_dstates_batch + pid_h * stride_dstates_head + (nchunks - 1) * stride_dstates_chunk
+     dA_cs_ptr += pid_b * stride_dA_cs_batch + pid_h * stride_dA_cs_head + (nchunks - 1) * stride_dA_cs_chunk
+     ddA_cs_ptr += pid_b * stride_ddA_cs_batch + pid_h * stride_ddA_cs_head + (nchunks - 1) * stride_ddA_cs_chunk + pid_m
+--- a/ssd_bmm.py
++++ b/ssd_bmm.py
+@@ -49,13 +49,13 @@
+     HAS_SEQ_IDX: tl.constexpr,
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
+ ):
+-    pid_b = tl.program_id(axis=1)
+-    pid_ch = tl.program_id(axis=2)
++    pid_b = tl.program_id(axis=1).to(tl.int64)
++    pid_ch = tl.program_id(axis=2).to(tl.int64)
+     pid_c = pid_ch // ngroups
+     pid_h = pid_ch - pid_c * ngroups
+     num_pid_n = tl.cdiv(chunk_size, BLOCK_SIZE_N)
+-    pid_m = tl.program_id(axis=0) // num_pid_n
+-    pid_n = tl.program_id(axis=0) % num_pid_n
++    pid_m = tl.program_id(axis=0).to(tl.int64) // num_pid_n
++    pid_n = tl.program_id(axis=0).to(tl.int64) % num_pid_n
+     if IS_CAUSAL:
+         if pid_n * BLOCK_SIZE_N >= (pid_m + 1) * BLOCK_SIZE_M:
+             return
+@@ -122,13 +122,13 @@
+     HAS_RESIDUAL: tl.constexpr,
+     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_CS: tl.constexpr,
+ ):
+-    pid_b = tl.program_id(axis=1)
+-    pid_ch = tl.program_id(axis=2)
++    pid_b = tl.program_id(axis=1).to(tl.int64)
++    pid_ch = tl.program_id(axis=2).to(tl.int64)
+     pid_c = pid_ch // ngroups
+     pid_h = pid_ch - pid_c * ngroups
+     num_pid_n = tl.cdiv(K, BLOCK_SIZE_N)
+-    pid_m = tl.program_id(axis=0) // num_pid_n
+-    pid_n = tl.program_id(axis=0) % num_pid_n
++    pid_m = tl.program_id(axis=0).to(tl.int64) // num_pid_n
++    pid_n = tl.program_id(axis=0).to(tl.int64) % num_pid_n
+
+     a_ptr += pid_b * stride_a_batch + pid_c * chunk_size * stride_a_seqlen + pid_h * stride_a_head
+     dout_ptr += pid_b * stride_dout_batch + pid_c * stride_dout_chunk + pid_h * stride_dout_head
+--- a/ssd_combined.py
++++ b/ssd_combined.py
+@@ -72,7 +72,12 @@
+     already a multiple of 8.
+     """
+     assert inp.shape[2] % 8 == 0, "Number of convolution channels is required to be a multiple of 8."
+-    return inp if inp.stride(1) % 8 == 0 else inp.contiguous()
++    # causal_conv1d uses uint32 element offsets. A strided projection view
++    # can wrap those offsets even when the convolution tensor itself fits.
++    max_offset = sum((size - 1) * stride for size, stride in zip(inp.shape, inp.stride()))
++    if inp.numel() >= 2**32:
++        raise RuntimeError("causal_conv1d requires fewer than 2**32 elements per tensor")
++    return inp if inp.stride(1) % 8 == 0 and max_offset < 2**32 else inp.contiguous()
+
+
+ @triton.autotune(
+@@ -120,13 +125,13 @@
+     IS_TRITON_22: tl.constexpr,
+     DETERMINISTIC_REDUCTION: tl.constexpr,
+ ):
+-    pid_bc = tl.program_id(axis=1)
++    pid_bc = tl.program_id(axis=1).to(tl.int64)
+     pid_c = pid_bc // batch
+     pid_b = pid_bc - pid_c * batch
+-    pid_h = tl.program_id(axis=2)
++    pid_h = tl.program_id(axis=2).to(tl.int64)
+     num_pid_n = tl.cdiv(hdim, BLOCK_SIZE_N)
+-    pid_m = tl.program_id(axis=0) // num_pid_n
+-    pid_n = tl.program_id(axis=0) % num_pid_n
++    pid_m = tl.program_id(axis=0).to(tl.int64) // num_pid_n
++    pid_n = tl.program_id(axis=0).to(tl.int64) % num_pid_n
+     x_ptr += pid_b * stride_x_batch + pid_c * chunk_size * stride_x_seqlen + pid_h * stride_x_head
+     cb_ptr += pid_b * stride_cb_batch + pid_c * stride_cb_chunk + (pid_h // nheads_ngroups_ratio) * stride_cb_head
+     dout_ptr += pid_b * stride_dout_batch + pid_c * chunk_size * stride_dout_seqlen + pid_h * stride_dout_head
+--- a/layernorm_gated.py
++++ b/layernorm_gated.py
+@@ -63,8 +63,8 @@
+     IS_RMS_NORM: tl.constexpr,
+ ):
+     # Map the program id to the row of X and Y it should compute.
+-    row = tl.program_id(0)
+-    group = tl.program_id(1)
++    row = tl.program_id(0).to(tl.int64)
++    group = tl.program_id(1).to(tl.int64)
+     X += row * stride_x_row + group * N
+     Y += row * stride_y_row + group * N
+     if HAS_Z:
+@@ -185,8 +185,8 @@
+     BLOCK_N: tl.constexpr,
+ ):
+     # Map the program id to the elements of X, DX, and DY it should compute.
+-    row_block_id = tl.program_id(0)
+-    group = tl.program_id(1)
++    row_block_id = tl.program_id(0).to(tl.int64)
++    group = tl.program_id(1).to(tl.int64)
+     row_start = row_block_id * rows_per_program
+     cols = tl.arange(0, BLOCK_N)
+     mask = cols < N

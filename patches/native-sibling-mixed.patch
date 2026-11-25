@@ -1,0 +1,231 @@
+--- a/nemo_rl/experience/rollout_manager.py
++++ b/nemo_rl/experience/rollout_manager.py
+@@ -1034,14 +1034,24 @@
+         resolved_agent_ref = rollout_inputs[0].get("agent_ref")
+         if not isinstance(resolved_agent_ref, dict):
+             raise ValueError("NeMo-Gym did not return a resolved agent_ref")
+-        if any(
+-            row.get("agent_ref") != resolved_agent_ref for row in rollout_inputs[1:]
+-        ):
+-            raise ValueError(
+-                "NeMo-Gym resolved one prompt group to inconsistent agent_ref values"
+-            )
+         record_extra_env_info = copy.deepcopy(input_sample["extra_env_info"])
+-        record_extra_env_info["agent_ref"] = copy.deepcopy(resolved_agent_ref)
++        variants = record_extra_env_info.get("sibling_variants")
++        if variants is None:
++            if any(row.get("agent_ref") != resolved_agent_ref for row in rollout_inputs[1:]):
++                raise ValueError("NeMo-Gym resolved one prompt group to inconsistent agent_ref values")
++            record_extra_env_info["agent_ref"] = copy.deepcopy(resolved_agent_ref)
++        else:
++            from mmrl.sibling_routes import SCHEDULE
++            sibling_agents = {}
++            for row in rollout_inputs:
++                index = row["_rowidx"]
++                expected = variants[SCHEDULE[index]]["agent_ref"]
++                if row.get("agent_ref") != expected:
++                    raise ValueError("NeMo-Gym changed the assigned sibling harness")
++                sibling_agents[str(index)] = copy.deepcopy(expected)
++            record_extra_env_info.pop("agent_ref", None)
++            record_extra_env_info["route"] = "mixed"
++            record_extra_env_info["sibling_agent_refs"] = sibling_agents
+ 
+         return PromptGroupRecord(
+             prompt_idx=input_sample["idx"],
+@@ -1131,6 +1141,10 @@
+                 # derives the id from the run body and stamps /ng-rollout/<id>
+                 # on every model call, so the TQ sample id IS the capture key.
+                 row["_ng_rollout_id"] = rollout_ids[i]
++            variants = template_row.get("sibling_variants")
++            if variants is not None:
++                from mmrl.sibling_routes import apply_variant
++                row = apply_variant(row, variants, siblings=self._num_generations_per_prompt)
+             rows.append(row)
+         return rows
+ 
+@@ -1187,6 +1201,9 @@
+             if rowidx in received:
+                 raise ValueError(f"NeMo-Gym returned duplicate row index {rowidx}")
+             received.add(rowidx)
++            if inputs_by_rowidx[rowidx].get("_mixed_sibling_route") is not None:
++                from mmrl.sibling_routes import validate_resolved_agent
++                validate_resolved_agent(inputs_by_rowidx[rowidx], resolved_agent_ref)
+             inputs_by_rowidx[rowidx]["agent_ref"] = resolved_agent_ref
+             # A streamed completion may become durable recovery ownership before
+             # the rest of its prompt group finishes. Shape its reward first so a
+@@ -1231,6 +1248,9 @@
+         # These rows are all one prompt's generations.
+         # They share one Gym route and must stay on one instance.
+         shard_set = as_nemo_gym_shard_set(self._task_to_env["nemo_gym"])
++        route_names = {get_nemo_gym_route_name(row) for row in inputs}
++        if len({shard_set.shard_for_route(route) for route in route_names}) != 1:
++            raise ValueError("Mixed siblings require all harness routes on the same Gym shard")
+         nemo_gym_env = shard_set.pick_handle(get_nemo_gym_route_name(inputs[0]))
+         instance_label = shard_set.instance_label(nemo_gym_env)
+         instance_timer_prefix = f"{timer_prefix}/shard/{instance_label}"
+@@ -1372,9 +1392,16 @@
+ 
+         # Compute rollout metrics.
+         with timer.time(f"{timer_prefix}/compute_metrics"):
+-            rollout_metrics = self._compute_rollout_metrics(
+-                completions, _nemo_gym_metric_namespace(inputs[0])
+-            )
++            if any(row.get("_mixed_sibling_route") is not None for row in inputs):
++                from mmrl.sibling_routes import mixed_metrics
++                rollout_metrics = mixed_metrics(
++                    completions, inputs, self._compute_rollout_metrics,
++                    _nemo_gym_metric_namespace,
++                )
++            else:
++                rollout_metrics = self._compute_rollout_metrics(
++                    completions, _nemo_gym_metric_namespace(inputs[0])
++                )
+             # Same helper the batched path uses, so the two cannot drift apart.
+             rollout_metrics.update(_effort_shaping_metrics(shaping))
+             rollout_metrics.update(
+--- a/nemo_rl/experience/rollout_recovery.py
++++ b/nemo_rl/experience/rollout_recovery.py
+@@ -24,6 +24,8 @@
+ 
+ import copy
+ import dataclasses
++import os
++from pathlib import Path
+ import uuid
+ from collections.abc import Mapping
+ from dataclasses import dataclass, field
+@@ -309,6 +311,29 @@
+     return staging_keys
+ 
+ 
++def _register_original_history_attempt(record, generation_index, attempt):
++    """Register only identities minted here, never identities loaded from disk."""
++    root = os.environ.get("NEMO_GYM_EXPERIMENTAL_ORIGINAL_TOOL_HISTORY", "")
++    if not root:
++        return
++    payload = record.runtime_prompt_payload or {}
++    extra = payload.get("extra_env_info") or {}
++    variants = extra.get("sibling_variants")
++    if variants is not None:
++        # Resolve the same stable sibling index used at Gym dispatch. The
++        # group's template agent is not the agent of every mixed sibling.
++        from mmrl.sibling_routes import apply_variant
++        row = dict(extra, _rowidx=generation_index)
++        route = apply_variant(row, variants, siblings=record.expected_generations)["agent_ref"]
++    else:
++        route = extra.get("agent_ref") or {}
++    if route.get("type") != "responses_api_agents" or route.get("name") != "mm_opencode":
++        return
++    from nemo_rl.utils.original_history_activation import register_new_attempt
++    scope = f"{record.logical_rollout_id(generation_index)}_a{attempt.attempt_id}"
++    register_new_attempt(Path(root) / "activation", scope, harness="opencode")
++
++
+ class RolloutRecoveryLedger:
+     """In-memory source of truth for token-capture rollout ownership.
+ 
+@@ -388,6 +413,8 @@
+                 PromptGroupPhase.ADMITTED if admitted else PromptGroupPhase.RESERVED
+             ),
+         )
++        for sibling in record.siblings:
++            _register_original_history_attempt(record, sibling.generation_index, sibling.current_attempt)
+         self._groups[group_id] = record
+         return self._copy_group(record)
+ 
+@@ -515,9 +542,10 @@
+         ):
+             raise ValueError(
+                 "prompt-group retry requires every sibling attempt to be abandoned "
+-                "or failed together"
+-            )
+-
++                    "or failed together"
++                )
++
++        pending_attempts = []
+         for sibling in record.siblings:
+             attempt = sibling.current_attempt
+             if (
+@@ -536,7 +564,13 @@
+                     f"{record.logical_rollout_id(sibling.generation_index)!r} "
+                     f"from status {attempt.status.value!r}"
+                 )
+-            sibling.attempts.append(_new_attempt())
++            fresh_attempt = _new_attempt()
++            _register_original_history_attempt(record, sibling.generation_index, fresh_attempt)
++            pending_attempts.append((sibling, fresh_attempt))
++        # Registration can fail (permissions, full disk). Keep the recovery
++        # record unchanged until every replacement is ready for dispatch.
++        for sibling, fresh_attempt in pending_attempts:
++            sibling.attempts.append(fresh_attempt)
+         return self._copy_group(record)
+ 
+     def mark_group_dispatched(
+--- /dev/null
++++ b/nemo_rl/utils/original_history_activation.py
+@@ -0,0 +1,64 @@
++"""Host-issued, immutable per-attempt opt-in. Isolated; not deployed.
++
++Only the trusted rollout issuer may register a newly minted attempt. Neither
++model messages nor sandbox HTTP headers are authorization to register one.
++The registry must be outside the sandbox's mounted/writable filesystem.
++"""
++import hashlib
++import json
++import os
++from pathlib import Path
++import tempfile
++
++
++def _path(root, attempt):
++    if not isinstance(attempt, str) or not attempt:
++        raise ValueError("Nonempty attempt identity required")
++    root = Path(root)
++    if not root.is_absolute():
++        raise ValueError("Absolute host registry path required")
++    return root / (hashlib.sha256(attempt.encode()).hexdigest() + '.json')
++
++
++def register_new_attempt(root, attempt, *, harness):
++    """Call exactly once, at trusted attempt creation, before any dispatch.
++
++    Old/restored attempts must not call this method. Duplicate registration is
++    an error, including the same harness: retries belong to the existing attempt.
++    Registration itself does not prove that the caller minted a fresh identity.
++    """
++    if harness != 'opencode':
++        return False
++    target = _path(root, attempt)
++    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
++    value = {'schema': 1, 'attempt': attempt, 'harness': harness}
++    fd, temp = tempfile.mkstemp(prefix='.activation-', dir=target.parent)
++    try:
++        with os.fdopen(fd, 'w') as handle:
++            json.dump(value, handle)
++            handle.flush()
++            os.fsync(handle.fileno())
++        # Atomic publication without replacing an existing scope decision.
++        os.link(temp, target)
++        directory = os.open(target.parent, os.O_RDONLY | os.O_DIRECTORY)
++        try:
++            os.fsync(directory)
++        finally:
++            os.close(directory)
++    finally:
++        os.unlink(temp)
++    return True
++
++
++def is_enabled(root, attempt):
++    """Read a host decision; absent means leave the original capture path alone."""
++    target = _path(root, attempt)
++    try:
++        fd = os.open(target, os.O_RDONLY | os.O_NOFOLLOW)
++    except FileNotFoundError:
++        return False
++    with os.fdopen(fd) as handle:
++        value = json.load(handle)
++    if value != {'schema': 1, 'attempt': attempt, 'harness': 'opencode'}:
++        raise ValueError('Invalid or mismatched activation decision')
++    return True

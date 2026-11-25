@@ -1,0 +1,20 @@
+# Supply a digest-pinned image containing the EXISTING locked Gym environment,
+# Python >=3.13.14, Node, and the pinned harness dependencies. No training wheels
+# are resolved here. Build on the image service after OpenSandbox onboarding.
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    texlive-latex-base texlive-latex-extra texlive-fonts-recommended texlive-science texlive-pictures \
+    poppler-utils libcairo2 fonts-dejavu fonts-liberation file \
+    && rm -rf /var/lib/apt/lists/*
+COPY mmrl /opt/mmrl/mmrl
+COPY mmrl/render.py /opt/mmrl/render.py
+ENV PYTHONPATH=/opt/mmrl
+ENV PATH=/opt/gym/bin:$PATH
+WORKDIR /workspace
+# Browser/render dependencies must be prebuilt from the renderer lock supplied
+# with the selected base image; fail if that contract is not satisfied.
+RUN /opt/gym/bin/python -c "import playwright.sync_api,cairosvg,matplotlib,PIL,nemo_gym" \
+    && /opt/hermes/bin/python -c "from run_agent import AIAgent" \
+    && node --version && codex --version && opencode --version && file --version

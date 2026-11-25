@@ -1,0 +1,57 @@
+# Build the context emitted by scripts/prepare_image.py on an amd64 builder.
+# Supply digest-pinned Python 3.13.14+, Node 22 bookworm and uv 0.10.0 images.
+ARG PYTHON_IMAGE
+ARG NODE_IMAGE
+ARG UV_IMAGE
+FROM ${NODE_IMAGE} AS node
+FROM ${UV_IMAGE} AS uv
+FROM ${PYTHON_IMAGE}
+USER root
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=uv /uv /usr/local/bin/uv
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+ && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+ENV DEBIAN_FRONTEND=noninteractive PLAYWRIGHT_BROWSERS_PATH=/opt/browsers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates git curl bash file libcairo2 texlive-latex-base texlive-latex-extra \
+    texlive-fonts-recommended poppler-utils fonts-dejavu fonts-liberation \
+ && rm -rf /var/lib/apt/lists/*
+COPY *.requirements.txt /opt/locks/
+COPY blender.lock.json manim.assets.lock.json install_benchmark_renderers.py /opt/locks/
+ARG INSTALL_BENCHMARK_RENDERERS=0
+RUN if [ "$INSTALL_BENCHMARK_RENDERERS" = 1 ]; then \
+      apt-get update && apt-get install -y --no-install-recommends \
+        libpango1.0-dev libcairo2-dev pkg-config ffmpeg build-essential python3-dev dvisvgm \
+        libx11-6 libxxf86vm1 libxi6 libxfixes3 libxrender1 libgl1 libsm6 libglib2.0-0 xz-utils \
+      && uv venv /opt/manim \
+      && uv pip install --python /opt/manim/bin/python --require-hashes --no-deps \
+           -r /opt/locks/manim.hashed.requirements.txt \
+      && python /opt/locks/install_benchmark_renderers.py \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi
+RUN uv venv /opt/gym && uv venv /opt/hermes \
+ && uv pip install --python /opt/gym/bin/python --require-hashes --no-deps \
+      -r /opt/locks/gym.requirements.txt -r /opt/locks/renderer.requirements.txt \
+ && uv pip install --python /opt/hermes/bin/python --require-hashes --no-deps \
+      -r /opt/locks/hermes-runtime.requirements.txt -r /opt/locks/hermes-gym.requirements.txt \
+      -r /opt/locks/hermes-extra.requirements.txt
+COPY hermes-source /opt/hermes-source
+RUN uv pip install --python /opt/hermes/bin/python --no-build-isolation --no-deps /opt/hermes-source
+RUN npm install -g @openai/codex@0.144.4 opencode-ai@1.17.11 \
+ && /opt/gym/bin/python -m playwright install --with-deps chromium
+RUN apt-get update && apt-get install -y --no-install-recommends texlive-science texlive-pictures \
+ && rm -rf /var/lib/apt/lists/*
+COPY gym-source /opt/gym-source
+COPY mmrl /opt/mmrl/mmrl
+COPY mmrl/render.py /opt/mmrl/render.py
+ENV PATH=/opt/gym/bin:$PATH PYTHONPATH=/opt/gym-source:/opt/mmrl
+WORKDIR /workspace
+RUN python /opt/mmrl/render.py --check \
+ && python -c "import cv2, numpy as np; from skimage.metrics import structural_similarity; a = np.zeros((16,16), dtype=np.uint8); assert cv2.resize(a, (8,8)).shape == (8,8); assert structural_similarity(a, a, data_range=255) == 1.0" \
+ && /opt/hermes/bin/python -c "from run_agent import AIAgent; import responses_api_agents.hermes_agent.app" \
+ && codex --version && opencode --version && file --version
+RUN if [ "$INSTALL_BENCHMARK_RENDERERS" = 1 ]; then \
+      python -c "from mmrl.manim_render import check_runtime; check_runtime('/opt/manim/bin/python')" \
+      && /opt/blender/blender --background --version; \
+    fi

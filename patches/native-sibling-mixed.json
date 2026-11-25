@@ -1,0 +1,18 @@
+{
+  "description": "Same-prompt four-route sibling expansion and retry identity, preserving source-lock failure masks. Original-history opt-in additionally requires matching Gym capture support.",
+  "files": {
+    "nemo_rl/experience/rollout_manager.py": {
+      "before_sha256": "ca1badc08f9af7a8cce8692f121c7a73147cd3e87131d223ee266ece52bc715f",
+      "after_sha256": "f3fe7ce966b8c9f769dab1da37fbdb947a0d29a84a3f48238d21916bb6b47695"
+    },
+    "nemo_rl/experience/rollout_recovery.py": {
+      "before_sha256": "e1d2b7dd3321a911b6ffad6bba9fe936d06b4bac6f9207d3f12e94ca5dac7d77",
+      "after_sha256": "49ea5b69cdf0d7596ee518802a5a12e75657f7eba4cfb5c544804d709b777011"
+    },
+    "nemo_rl/utils/original_history_activation.py": {
+      "before_sha256": null,
+      "after_sha256": "48662452f205af5fb1b9c19b7cabe05705a98f3794e423621e0062242abb3bb3"
+    }
+  },
+  "patch_sha256": "b6732512b74529885d5fb3ac2ddfb353e21b902b5853d904ba32d759af97d0a5"
+}

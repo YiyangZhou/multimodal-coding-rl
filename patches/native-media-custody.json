@@ -1,0 +1,9 @@
+{
+  "patch_sha256": "ec6b58866fd347042b99590ccf5c156af304a47357bf11db10e05a9f74a9e9a5",
+  "files": {
+    "nemo_rl/experience/rollout_reassembler.py": {
+      "before_sha256": "fabd41cd64862f61be484c10398bb47ac929d55386166269b004f093f6998e3f",
+      "after_sha256": "b141788017d20ea787ca8d09448a4a3626a745a65229bc40e973be4c6fc8d016"
+    }
+  }
+}

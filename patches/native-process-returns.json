@@ -1,0 +1,46 @@
+{
+  "description": "Optional verified per-call returns through native receipt finalization, token-aligned queue storage and GRPO advantage stage. Capture patch prerequisite; disabled by default. Real learner update pending.",
+  "patch_sha256": "dee3d2ad79c3babbc4febf850de75c4fef4abfd9f4996b2803191c13762503a9",
+  "files": {
+    "examples/configs/grpo_math_1B_megatron_single_controller.yaml": {
+      "before_sha256": "64d498370115ed3106916232017aa0b86786e2c95bd09086327c78914232fd62",
+      "after_sha256": "79319d72125461793090828880f8bbe9d20faca29290afc595f2116263d9b3aa"
+    },
+    "nemo_rl/algorithms/single_controller_utils/advantage_stage.py": {
+      "before_sha256": "2d70570037c3c181093cc1529d432797e13443e5d51d4692a7efb827518fae20",
+      "after_sha256": "ce6b8628df25eacb7f01a1a81662c955c01e67fdd4325244d7fb74d91e3474e3"
+    },
+    "nemo_rl/algorithms/single_controller_utils/config.py": {
+      "before_sha256": "edc78fb099013cbc26c40cc6aa1bed17e4efed978ddb623b1a1a898056755ac8",
+      "after_sha256": "d5f46c5597672877af4164fc9c9b7a7703609fdbb46ad5f13b6799ad139ce188"
+    },
+    "nemo_rl/algorithms/single_controller_utils/setup.py": {
+      "before_sha256": "06709ca2b54b5332e338d4f2b0feb0705561c66d135c23d262ea3220b404f3c1",
+      "after_sha256": "a3a54a9928c8ea4da6c004ffd479241e2f78f90cdbf5dc5305ae849d011f863a"
+    },
+    "nemo_rl/data_plane/column_io.py": {
+      "before_sha256": "2ed8af38c64d256f381da126d0aed7f69e6ad1a05ed3344e2bca8fdbbf02d30d",
+      "after_sha256": "54ab3d190a747c8e9b91eb402504ecf6da86401c6811943ba3460eb0ed89e2f4"
+    },
+    "nemo_rl/data_plane/schema.py": {
+      "before_sha256": "630da9df4e53dcf31f4e821ce11b0e933ae86a35d32a64250fe925d3fd0b5f07",
+      "after_sha256": "c0f68751806e8ea01a8cccbe83b10d3eca91277de0ba98cdb608b64e8613a428"
+    },
+    "nemo_rl/environments/nemo_gym.py": {
+      "before_sha256": "bc18e626f0453aba7be3534a5914770310ca0bc8ed6444383843a87c14c54c6e",
+      "after_sha256": "6f83b0a75cef58f0017c20a1a0a3b8ab0550ac4f56f983058cb1825bb550641a"
+    },
+    "nemo_rl/experience/process_returns.py": {
+      "before_sha256": null,
+      "after_sha256": "78d65f3924ef8bb22b4ec574934cb911f1524fa4dc5795251a7de72c3aea3c87"
+    },
+    "nemo_rl/experience/rollout_reassembler.py": {
+      "before_sha256": "0bc8cc0162d5dec14447807eeb7c22228f9396212267eac4f96f266d16bbab1d",
+      "after_sha256": "fabd41cd64862f61be484c10398bb47ac929d55386166269b004f093f6998e3f"
+    },
+    "nemo_rl/experience/rollout_reassembler_actor.py": {
+      "before_sha256": "7f23986d1cb0890065e00a1652a5a0dd4bf64c75906f7843338de7414f9f6f06",
+      "after_sha256": "6f8171e4085979335e65c28596a94d76b2a6e9de5f3bcfe26b341b20f3c4df95"
+    }
+  }
+}

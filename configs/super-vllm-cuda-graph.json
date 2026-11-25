@@ -1,0 +1,26 @@
+{
+  "policy": {
+    "generation": {
+      "vllm_cfg": {
+        "enforce_eager": false
+      },
+      "vllm_kwargs": {
+        "compilation_config": {
+          "mode": 0,
+          "cudagraph_mode": "FULL_DECODE_ONLY",
+          "cudagraph_capture_sizes": [
+            1,
+            2,
+            4,
+            8,
+            16,
+            32,
+            48,
+            56,
+            64
+          ]
+        }
+      }
+    }
+  }
+}

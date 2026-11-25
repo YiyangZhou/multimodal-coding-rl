@@ -1,0 +1,17 @@
+--- a/nemo_rl/environments/nemo_gym.py
++++ b/nemo_rl/environments/nemo_gym.py
+@@ -623,7 +623,14 @@
+             )
+             policy_overrides["return_token_id_information"] = False
+             capture_dir = os.path.abspath(token_capture["capture_dir"])
++            # Preserve the explicitly configured Gym protection when replacing
++            # the legacy capture block with ledger-authoritative settings.
++            requested_capture = initial_global_config_dict.get("token_id_capture") or {}
++            fail_fast = requested_capture.get("fail_fast_poisoned_rollouts", False)
++            if type(fail_fast) is not bool:
++                raise ValueError("fail_fast_poisoned_rollouts must be a boolean")
+             initial_global_config_dict["token_id_capture"] = {
++                "fail_fast_poisoned_rollouts": fail_fast,
+                 "enabled": True,
+                 "all_agents": True,
+                 "rebuild_response": False,

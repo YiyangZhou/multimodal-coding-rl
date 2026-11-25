@@ -1,0 +1,12 @@
+{
+  "version": "5.0.0",
+  "platform": "linux-x64",
+  "url": "https://download.blender.org/release/Blender5.0/blender-5.0.0-linux-x64.tar.xz",
+  "sha256": "9de96e81432afba9c0a715c7233f1eff616705b75226dc5d0fa2708ddfb0e525",
+  "checksum_source": "https://download.blender.org/release/Blender5.0/blender-5.0.0.sha256",
+  "upstream_renderer_commit": "42c7780ed3fcbd466f17f058f62e7996233777f7",
+  "upstream_renderer_path": "core/render.py",
+  "upstream_renderer_sha256": "0b026a835e385338b396604ccb48d2555ff3ef74786cb4ba80ff83f78fbc1934",
+  "upstream_license_path": "LICENSE",
+  "upstream_license_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+}
