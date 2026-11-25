@@ -41,7 +41,7 @@ These diagrams describe the integration contracts, not a claim of public-stack G
 - `benchmarks/`: benchmark acquisition specifications.
 - `tests/`: CPU contract tests and separate native/GPU acceptance checks.
 
-Supported task adapters include Chart2Code, Img2SVG, Text2SVG, WebMMU Code Edit and Mockup2Code, Image2Struct, Design2Code, ChartMimic, Vision2Web, ManimBench, and 3DCodeBench. Route availability is defined in `mmrl/catalog.py`; dataset support does not imply every task supports every harness.
+Supports multimodal coding tasks across charts, SVG, web interfaces, structured scenes, animations, and 3D modeling.
 
 Gym is an external dependency. This repository does not distribute a Gym checkout, Gym patches, datasets, or deployment configurations. Runtime checks require externally supplied verification manifests through `MMRL_EXTERNAL_GYM_PATCH_DIR`; a stock upstream installation has not yet been validated with all integration features.
 
