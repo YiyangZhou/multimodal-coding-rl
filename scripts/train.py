@@ -19,11 +19,16 @@ def main():
     p.add_argument("--config", required=True)
     p.add_argument("--rl-root", required=True)
     p.add_argument("--check-only", action="store_true")
+    p.add_argument("--public-runtime", action="store_true", help="Verify the experimental public-source composite runtime")
     args = p.parse_args()
     root = Path(args.rl_root).resolve()
     cfg = json.loads(Path(args.config).read_text())
     validate_thinking_parser(cfg)
     validate_capture_retries(cfg)
+    installer = str(Path(__file__).with_name("apply_capture_patch.py"))
+    if args.public_runtime:
+        subprocess.run([sys.executable, installer, "--rl-root", str(root),
+                        "--public-runtime", "--check"], check=True)
     history_enabled = original_history_root(cfg, os.environ) is not None
     if history_enabled:
         installer = str(Path(__file__).with_name("apply_capture_patch.py"))
@@ -32,11 +37,14 @@ def main():
             ("--rl-root", str(root), "--history-bridge"),
             ("--gym-root", os.environ["NEMO_GYM_ROOT"], "--original-history"),
         ):
+            if args.public_runtime and source == "--rl-root":
+                continue  # The composite manifest verifies these native layers together.
             subprocess.run([sys.executable, installer, source, path, profile, "--check"], check=True)
     if cfg.get("data", {}).get("train", {}).get("dataset_name") == "mmrl.mixed_dataset.BalancedMixedGymDataset":
         validate_sibling_recipe(cfg)
-        subprocess.run([sys.executable, str(Path(__file__).with_name("apply_capture_patch.py")),
-                        "--rl-root", str(root), "--sibling-mixed", "--check"], check=True)
+        if not args.public_runtime:
+            subprocess.run([sys.executable, installer, "--rl-root", str(root),
+                            "--sibling-mixed", "--check"], check=True)
     provider_config()  # Fail before spawning actors or accepting local defaults.
     if len(os.environ.get("MMRL_CAPTURE_GATEWAY_TOKEN", "")) < 32:
         raise SystemExit("Configure a dedicated random MMRL_CAPTURE_GATEWAY_TOKEN")

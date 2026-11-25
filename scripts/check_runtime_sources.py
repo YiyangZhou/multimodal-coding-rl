@@ -28,10 +28,11 @@ def main():
     parser.add_argument('--rl-root', required=True, type=Path)
     parser.add_argument('--gym-root', type=Path)
     parser.add_argument('--gym-manifest', type=Path, help='External Gym verification manifest (not distributed here)')
+    parser.add_argument('--public-runtime', action='store_true', help='Inspect the experimental composite public-source profile')
     args = parser.parse_args()
     patches = Path(__file__).resolve().parents[1] / 'patches'
     results = {}
-    profiles = [('rl', args.rl_root, patches / 'automodel-captured-images.json')]
+    profiles = [('rl', args.rl_root, patches / ('public-native-runtime.json' if args.public_runtime else 'automodel-captured-images.json'))]
     if args.gym_root:
         if not args.gym_manifest:
             parser.error('--gym-root requires --gym-manifest from the external runtime')

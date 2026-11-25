@@ -1,0 +1,230 @@
+{
+  "description": "Experimental public-source port of capture, ready-first, multi-turn, sibling mix, and history bridge. Source installation checked; native runtime acceptance pending.",
+  "source_commits": {
+    ".": "31b4c0295cff085e74f2724e2cf057e5b3e3ae04",
+    "3rdparty/Automodel-workspace/Automodel": "72daceffa54d77783e1f73a5ac165eb39b6b5ea1"
+  },
+  "files": {
+    "examples/configs/grpo_math_1B.yaml": {
+      "before_sha256": "89f3c965899c52780b72d933310064c52c64a4aac7624b1e7a28439c13426959",
+      "after_sha256": "733c6d386191b76832677036777a104c3354e60f7550433720aa3be7b0af4d22"
+    },
+    "examples/configs/grpo_math_1B_megatron_single_controller.yaml": {
+      "before_sha256": "4c9278a911429c3018e08e144b3e40994f71b4b17a214efed2832dee16bac82d",
+      "after_sha256": "fac77d2e34eb4664902993c9a3eb17fd7e9760eb68b9d73c6985167fd1a2dd70"
+    },
+    "nemo_rl/algorithms/async_utils/replay_buffer.py": {
+      "before_sha256": "bac2fa38b5962d61c82e54204e54e6f3de0ab2c54c62407b6d71e3dc31fa322b",
+      "after_sha256": "adc1160d10168a8ee5d06562e2a4e08c06d2916de16a70d29e74bbbd5858f223"
+    },
+    "nemo_rl/algorithms/async_utils/staleness_sampler.py": {
+      "before_sha256": "c5cb48c300b0888d79c7dc6edc77ab18827ff8e4ef4e2314c1eec1bd7aacd8fe",
+      "after_sha256": "40a43bb3f7b93ebe2a3c5863a239a8cdd398605d23497f5f179d2dbfaf7254c7"
+    },
+    "nemo_rl/algorithms/grpo.py": {
+      "before_sha256": "acc5e30b6005685cb8f2a916edb1706d0f6d8e4dbd1b816384ba0fbfded58897",
+      "after_sha256": "cf9acc08d07620929753d9feca0af2b96dbf5ce5b3b25e1e738b47e0061d2dc0"
+    },
+    "nemo_rl/algorithms/length_penalty.py": {
+      "before_sha256": null,
+      "after_sha256": "7954bf3e14fbcc088c416e3de476a4882da6d6b104e38b41d7d0cc97ab7e427d"
+    },
+    "nemo_rl/algorithms/single_controller.py": {
+      "before_sha256": "4f6266f19c814897768f17a4f650878d046fe068ab0a91d5b637751e1aa15e43",
+      "after_sha256": "b3a531043db3a1feafdc0cce65dde7ce33743c91d0251ed1cd7684a6ebab9648"
+    },
+    "nemo_rl/algorithms/single_controller_utils/advantage_stage.py": {
+      "before_sha256": "46d1fbd00f784b74e7a0c10c707d4581dcbf564aaf0c4f01f2b43e64ca097eec",
+      "after_sha256": "3fa97576912172435c87f518b47aef79542c8c60ebede9957bee74fdcdb3a7c2"
+    },
+    "nemo_rl/algorithms/single_controller_utils/config.py": {
+      "before_sha256": "e32c373b1ac37c765dd5841bcbef812ca7013f79053610c5c1fb3c7066c6fe29",
+      "after_sha256": "a72b99fc68446dfa8bbc490c7d63879624ceea1b60915b329f3527f7f6244576"
+    },
+    "nemo_rl/algorithms/single_controller_utils/setup.py": {
+      "before_sha256": "e1c2d3dddaabf294985e0d169e2ffe9755560a97bf0518c4af6e015f095c6981",
+      "after_sha256": "60b6879334032aa0a656ff995533eccf0b59d30de533ac7aaba0255db6d28d3a"
+    },
+    "nemo_rl/algorithms/single_controller_utils/utils.py": {
+      "before_sha256": "7cd2d2da55e3baa7bf3eb4ce23b85c6e0a9809bbe1024f229b83334e8e1d1aaa",
+      "after_sha256": "56f344306bcf5166d5f85aa75233d38cfa5796db078727ae7b5746f029a17dd4"
+    },
+    "nemo_rl/data/captured_media.py": {
+      "before_sha256": "242efd88998d1f02aae4e1836fe0873f6bb9b9e2f0d3c432adefb0b57f6c6a97",
+      "after_sha256": "bb4e23c8d1500be93b019ac6fead48be36c87bfcf9e47ff2e8830e4fade236b1"
+    },
+    "nemo_rl/data/literal_media.py": {
+      "before_sha256": null,
+      "after_sha256": "24431dce7690dbafe179697f857a8809644757b003c28c67e72b947b3e47570b"
+    },
+    "nemo_rl/data/multimodal_utils.py": {
+      "before_sha256": "0207873f661bdb13e7eb98e9d95364c45465b46bf7555959e39e9648fb64f09e",
+      "after_sha256": "0dc76e389ed9da14d047fd79f10d9adf5087ccff354f307c2348284dbfc63e72"
+    },
+    "nemo_rl/data_plane/adapters/transfer_queue.py": {
+      "before_sha256": "7b82bfbc7b689741c4a47693c4cc96f16addfb8700a756cb53655d6f48cbdbc8",
+      "after_sha256": "79b9e78d8a0d87e931146f933654ec84ca396b1dd74e6a3c45215b8743711d0c"
+    },
+    "nemo_rl/data_plane/column_io.py": {
+      "before_sha256": "f33b0170276acdebc5d95402d02fc7fc427fc39c1f3bf004a2787ba8724fa131",
+      "after_sha256": "54ab3d190a747c8e9b91eb402504ecf6da86401c6811943ba3460eb0ed89e2f4"
+    },
+    "nemo_rl/data_plane/multimodal_fetch.py": {
+      "before_sha256": null,
+      "after_sha256": "daad20823bc4a37a11b639271e86012d26a12c04234ae56c6dd7257708bb1f1d"
+    },
+    "nemo_rl/data_plane/preshard.py": {
+      "before_sha256": "dc5460e78acd477c402fb9d6ad42e1d2b0be2b765b9153cf11069e81ea05b99e",
+      "after_sha256": "b527ed013a7a9f798de0a70e59f63fd7d31d2d5dd866a0e31b23eb829c8b81a4"
+    },
+    "nemo_rl/data_plane/schema.py": {
+      "before_sha256": "7afb7e9cd55431fe49c1dc5eb33aca4514832b98371f499c42bf392e35d3c0d8",
+      "after_sha256": "c0f68751806e8ea01a8cccbe83b10d3eca91277de0ba98cdb608b64e8613a428"
+    },
+    "nemo_rl/data_plane/worker_mixin.py": {
+      "before_sha256": "736a3362677e6795c82708815e0705eb7ee9ab93d3f1da5c4c012af7a94280b5",
+      "after_sha256": "9c81d2f55593f441c84158fd801794f051fba9d2406e4ce875b584f4de30bfee"
+    },
+    "nemo_rl/environments/nemo_gym.py": {
+      "before_sha256": "bc18e626f0453aba7be3534a5914770310ca0bc8ed6444383843a87c14c54c6e",
+      "after_sha256": "7729bf9dbd681c799530cbb377b506d0a5117712d42347033872f1d71fa2dc79"
+    },
+    "nemo_rl/experience/payload.py": {
+      "before_sha256": "34f6d2ff6c04459c9b010c50386a91316b8863b75d96d9146c40b9f95c157835",
+      "after_sha256": "315a54dc305e38de6d1c9a2c82fd6f81227ef45300b0fbde604e3b80b0674da8"
+    },
+    "nemo_rl/experience/process_returns.py": {
+      "before_sha256": null,
+      "after_sha256": "78d65f3924ef8bb22b4ec574934cb911f1524fa4dc5795251a7de72c3aea3c87"
+    },
+    "nemo_rl/experience/rollout_manager.py": {
+      "before_sha256": "b401900825983b256eacd93336e20c929a4bbb2f1cd5f483a15c639fbfc61c44",
+      "after_sha256": "fb94a6ed5474b4792c01bb09f398b0a1afcc39a0eb999126e5fc3812b6a4b446"
+    },
+    "nemo_rl/experience/rollout_reassembler.py": {
+      "before_sha256": "d9fd44d6c64f7ce3f7c561a99a8a5b7721780c5dfc8ff8c16ccf912bec3c936b",
+      "after_sha256": "565841eecfe486626b1607f017634dedecc748dc9a4c6db1c88490c0b7b39e7e"
+    },
+    "nemo_rl/experience/rollout_reassembler_actor.py": {
+      "before_sha256": "7f23986d1cb0890065e00a1652a5a0dd4bf64c75906f7843338de7414f9f6f06",
+      "after_sha256": "6f8171e4085979335e65c28596a94d76b2a6e9de5f3bcfe26b341b20f3c4df95"
+    },
+    "nemo_rl/experience/rollout_recovery.py": {
+      "before_sha256": "e1d2b7dd3321a911b6ffad6bba9fe936d06b4bac6f9207d3f12e94ca5dac7d77",
+      "after_sha256": "49ea5b69cdf0d7596ee518802a5a12e75657f7eba4cfb5c544804d709b777011"
+    },
+    "nemo_rl/experience/rollouts.py": {
+      "before_sha256": "b047728d70d87907765d322e3abe9490690c3490f66aa12c3e2896803df8b475",
+      "after_sha256": "06b02d61e2a5907b9bd23081b61c6b71bc2ea277b7e9bb70e587059243b8f7a0"
+    },
+    "nemo_rl/models/automodel/captured_images.py": {
+      "before_sha256": null,
+      "after_sha256": "472d0ae179a9d241ebb6f80bd43912e3991a1002519743e2703efd9dc079a769"
+    },
+    "nemo_rl/models/automodel/data.py": {
+      "before_sha256": "919edd77035fc23ac7b122cfebd4ec4c512a62a6df79b53e3d9419af69f10d7f",
+      "after_sha256": "4236ed091ddb61090383662944cef100bba68adabef4c2d975c4cb36a76a198b"
+    },
+    "nemo_rl/models/automodel/linear_logprobs.py": {
+      "before_sha256": null,
+      "after_sha256": "e7bd3fade9eddb02004c0ebb416affa646720656f7190e272e8cd77e283f0669"
+    },
+    "nemo_rl/models/automodel/local_padding.py": {
+      "before_sha256": null,
+      "after_sha256": "9cb519a8c9a59dcd8ec66b80cfe886230fba7843f9ffc37ea6355b444485d81b"
+    },
+    "nemo_rl/models/automodel/setup.py": {
+      "before_sha256": "e9df306bc15b1dffc43a1de832657a9eda1b54604f3d83b0a777f78cd4787027",
+      "after_sha256": "effbef0105b77837fa187602ee1b2a424d97774dbb41f0eb8a9f9c3db65a8a15"
+    },
+    "nemo_rl/models/automodel/train.py": {
+      "before_sha256": "400e8aa17f00002a7b0b97f9db672b3760b73876880a1fad47c6dbd9ceea1a5b",
+      "after_sha256": "4b44963cadfc1b13675670c4c03f8393af3f8f7989eb7ed60987b12df79d40fb"
+    },
+    "nemo_rl/models/generation/vllm/patches.py": {
+      "before_sha256": "5768764e5f612b2879b234ad37395dc8199e0b9b1a09bea56e5e42384961dfad",
+      "after_sha256": "95e34a1100e6562743be390d82c8336e3faad94e041260273c8a8e78cbc2ff9c"
+    },
+    "nemo_rl/models/generation/vllm/vllm_worker_async.py": {
+      "before_sha256": "d16b4b3be7cb1dca3b71138e316ca4cc75eb0b29a43642179a4c2f412e0e20ab",
+      "after_sha256": "7a6ae82bd5926654e37f3bd5dba2c06b9a28398fab21450545b4068611008419"
+    },
+    "nemo_rl/models/policy/__init__.py": {
+      "before_sha256": "dfa7207c00455d2b060f68e25efb848b4b8bc1e02b0e0d20e9bec6825fb5e921",
+      "after_sha256": "0fb42576d17efe7cb119025aa78e1024c593550c552d17f790a3aaed9cbaa4bd"
+    },
+    "nemo_rl/models/policy/tq_policy.py": {
+      "before_sha256": "59d218da1890f69c1d9431ed72ff5b6ca832b58c2a75c8be0fc707136036fb34",
+      "after_sha256": "739ac8213838b12aa6ca1db68fafee01cbfae00d973a867527d7fd4c5ad1b868"
+    },
+    "nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py": {
+      "before_sha256": "10315f603a7d923d8688d0673dfb38094388cc58d4ca9fc743924ee817f13059",
+      "after_sha256": "66e485f00676338a98194300e0d07047d13437a7e5552ec9824a3ae623d5d7bc"
+    },
+    "nemo_rl/utils/original_history_activation.py": {
+      "before_sha256": null,
+      "after_sha256": "48662452f205af5fb1b9c19b7cabe05705a98f3794e423621e0062242abb3bb3"
+    },
+    "tests/unit/data/test_captured_media.py": {
+      "before_sha256": "ed83e26ca5f9d239a0b2fdff04a87cdd7ca3282b58c0ef1fcb3f47ac909ad2c7",
+      "after_sha256": "aeef636f64cdec411a261ec4772c24986dbad2ef2a7b808ac1139e40831fc173"
+    },
+    "tests/unit/data/test_literal_media.py": {
+      "before_sha256": null,
+      "after_sha256": "41770ed608666dd3e265ac012c82a9675efcad0a4526be72fc1f6f786bab7ffb"
+    },
+    "tests/unit/data/test_media_token_validity_mask.py": {
+      "before_sha256": "0d16c6692ad9c56a436631652e36fd8da1b96e5b4d8e78800841b6850412daa3",
+      "after_sha256": "85472977c8901dd3fc8b138a3ec84884e41d75827a2a7da1453bf6c42643d7b4"
+    },
+    "tests/unit/experience/test_gym_mask_contract.py": {
+      "before_sha256": null,
+      "after_sha256": "2ef0f12dda1e9adc8df7570c392b3b49293f7395ba53a114a69a01bff3979921"
+    },
+    "tests/unit/models/automodel/test_automodel_setup.py": {
+      "before_sha256": "7249c921834dbb087ed923ede42e878099fc052a7be542ecbee522a61713a17e",
+      "after_sha256": "d82a5b2e1b0324e4334e915887a125429acbaf2561d87478f7e6f73081b55b91"
+    },
+    "tests/unit/models/automodel/test_captured_image_policy.py": {
+      "before_sha256": null,
+      "after_sha256": "f8e6afcbd945c90242cdc30ea2e861aab17fedd9402e89ad863f79035c8c31da"
+    },
+    "tests/unit/models/automodel/test_captured_images.py": {
+      "before_sha256": null,
+      "after_sha256": "8b0515d11173787c6653cba2d3564f2631db3c1217ba0743795d326a8b09b30f"
+    },
+    "tests/unit/models/generation/test_vllm_final_layernorm.py": {
+      "before_sha256": null,
+      "after_sha256": "1c2f63e99c85c7782e77a26a3a582c9d741adb65b064103fbf4be8e7548ebd56"
+    },
+    "tests/unit/reference_configs/grpo_math_1B.yaml": {
+      "before_sha256": "44966883b7d7e6ce7290e253a5e24f1bea9c8be6470b6b2fac1e2b279c72c502",
+      "after_sha256": "1ab3dcc6c4366b2583002147f716dcbeab1c78fdb007bbaec1ab41343e320608"
+    },
+    "tests/unit/single_controller/test_media_capture_preflight.py": {
+      "before_sha256": null,
+      "after_sha256": "fe5e448ab42567a1cc87c153b2760f0c2f5c179ea9865603281d6e2726bf6d44"
+    },
+    "3rdparty/Automodel-workspace/Automodel/nemo_automodel/components/models/common/utils.py": {
+      "before_sha256": "7d379cf9206b1251fce31a792fd08e1984efe9abd465cf3403524b334d3fa857",
+      "after_sha256": "2fd53b7cbcf02dbacf1bcea36bb0c56d16cc9004e590df817386abc047206874"
+    },
+    "3rdparty/Automodel-workspace/Automodel/nemo_automodel/components/models/nemotron_omni/model.py": {
+      "before_sha256": "17ce96c78568b8de92be5f35659ee8991d950cd6ddd56253b93e2b4bbdfa4c0d",
+      "after_sha256": "6c9e212342fe145986fcb5d7486d15749b0d4e79859066a6c8494462ffdf0654"
+    },
+    "3rdparty/Automodel-workspace/Automodel/nemo_automodel/components/moe/chunked_experts.py": {
+      "before_sha256": null,
+      "after_sha256": "f28ece6849eed8d57be9dbf091142383a1f79a15e908dd0070d2f64dcad17787"
+    },
+    "3rdparty/Automodel-workspace/Automodel/nemo_automodel/components/moe/experts.py": {
+      "before_sha256": "e5cc30bb78799d5dd281822fa79564852ca61da2ea88e5061bcc4aa1d9e956dc",
+      "after_sha256": "d50d59720305151dcd16cdf0d9d65f92bc43185827d211c7cf512c17372a12a2"
+    },
+    "3rdparty/Automodel-workspace/Automodel/tests/unit_tests/models/nemotron_omni/test_nemotron_omni_dynamic_res.py": {
+      "before_sha256": "ede39facee2c4fa6cfea0e83178e0a64c1d03dca14ed1e35b9d84ba8e3c90c6e",
+      "after_sha256": "b0d289b963d907d9a0e4c2d0c6e435fd21ba1b2bf7a9cd80e70a9c0e6f3de196"
+    }
+  },
+  "patch_sha256": "236a52162e1309c477c0f8a78c79403301ffad847a960780e86743a7187c23b9"
+}

@@ -44,10 +44,13 @@ def main():
     parser.add_argument("--sibling-mixed", action="store_true", help="Apply same-prompt sibling routing and recovery hooks")
     parser.add_argument("--original-history", action="store_true", help="Apply optional original tool-history capture after the Gym multi-turn profile")
     parser.add_argument("--history-bridge", action="store_true", help="Preserve original-history capture protection in native Gym configuration")
+    parser.add_argument("--public-runtime", action="store_true", help="Install the experimental composite port on pinned public NeMo RL and AutoModel sources")
     args = parser.parse_args()
-    modes = [args.process_tools, args.linear_logprobs, args.process_returns, args.local_padding, args.media_custody, args.ready_first, args.transport_diagnostics, args.super_multiturn, args.sibling_mixed, args.original_history, args.history_bridge]
+    modes = [args.public_runtime, args.process_tools, args.linear_logprobs, args.process_returns, args.local_padding, args.media_custody, args.ready_first, args.transport_diagnostics, args.super_multiturn, args.sibling_mixed, args.original_history, args.history_bridge]
     if sum(modes) > 1:
         parser.error("Apply one patch profile per invocation")
+    if args.public_runtime and not args.rl_root:
+        parser.error("--public-runtime requires --rl-root")
     if args.super_multiturn and not (args.rl_root or args.gym_root):
         parser.error("--super-multiturn requires --rl-root or --gym-root")
     if args.history_bridge and not args.rl_root:
@@ -73,7 +76,7 @@ def main():
         parser.error("--process-returns requires --rl-root and a separate invocation from --linear-logprobs")
     root = (args.rl_root or args.gym_root or args.mamba_root).resolve(strict=True)
     patch_name = (
-        ("native-history-bridge" if args.history_bridge else "native-sibling-mixed" if args.sibling_mixed else "native-super-multiturn" if args.super_multiturn else "native-ready-first" if args.ready_first else "native-media-custody" if args.media_custody else "automodel-local-padding" if args.local_padding else "native-process-returns" if args.process_returns else "automodel-linear-logprobs" if args.linear_logprobs else "automodel-captured-images")
+        ("public-native-runtime" if args.public_runtime else "native-history-bridge" if args.history_bridge else "native-sibling-mixed" if args.sibling_mixed else "native-super-multiturn" if args.super_multiturn else "native-ready-first" if args.ready_first else "native-media-custody" if args.media_custody else "automodel-local-padding" if args.local_padding else "native-process-returns" if args.process_returns else "automodel-linear-logprobs" if args.linear_logprobs else "automodel-captured-images")
         if args.rl_root
         else ("gym-original-history" if args.original_history else "gym-super-multiturn" if args.super_multiturn else "gym-transport-diagnostics" if args.transport_diagnostics else "gym-process-tools" if args.process_tools else "gym-harness-protocol")
         if args.gym_root
@@ -91,6 +94,16 @@ def main():
     manifest = json.loads((directory / f"{patch_name}.json").read_text())
     if digest(patch) != manifest["patch_sha256"]:
         raise SystemExit(f"{patch_name} patch does not match its manifest")
+    for relative, expected_commit in manifest.get("source_commits", {}).items():
+        source_path = Path(relative)
+        if source_path.is_absolute() or ".." in source_path.parts:
+            raise SystemExit("Invalid source checkout path: " + relative)
+        result = subprocess.run(
+            ["git", "-C", str(root / source_path), "rev-parse", "HEAD"],
+            capture_output=True, text=True,
+        )
+        if result.returncode or result.stdout.strip() != expected_commit:
+            raise SystemExit("Source revision mismatch: " + relative + " requires " + expected_commit)
     files = manifest["files"]
     current = {name: digest(root / name) for name in files}
     if all(current[name] == spec["after_sha256"] for name, spec in files.items()):
