@@ -29,7 +29,7 @@ The same-prompt mixture keeps prompt identities and route assignments consistent
 
 ![Prompt-group and same-prompt sibling routing](docs/mixed-flow.svg)
 
-These diagrams describe the integration contracts, not a claim of public-stack GPU validation. See [runtime compatibility](docs/runtime-compatibility.md). Regenerate them with `python scripts/build_readme_diagrams.py`.
+See [runtime compatibility](docs/runtime-compatibility.md). Regenerate them with `python scripts/build_readme_diagrams.py`.
 
 ## Components
 
@@ -79,7 +79,7 @@ For `sibling-mixed`, the recipe must use eight generations per prompt. Preserve 
 
 ## Training
 
-The package integrates with an installed NeMo RL runtime; it does not replace its PyTorch, vLLM, or distributed training dependencies. The patch manifests require exact source versions and intentionally reject incompatible checkouts. The historical native patches are snapshot-specific. An experimental composite profile installs on pinned public NeMo RL and AutoModel revisions; a fresh checkout of upstream `main` is not a supported installation. Data preparation and CPU contracts are tested separately; GPU training against a public-only dependency stack remains unverified. See [runtime compatibility](docs/runtime-compatibility.md).
+The package integrates with an installed NeMo RL runtime; it does not replace its PyTorch, vLLM, or distributed training dependencies. The patch manifests require exact source versions and intentionally reject incompatible checkouts. The historical native patches are snapshot-specific. An experimental composite profile installs on pinned public NeMo RL and AutoModel revisions; a fresh checkout of upstream `main` is not a supported installation. See [runtime compatibility](docs/runtime-compatibility.md).
 
 After installing a compatible runtime and binding the Gym environment, validate and launch inside a GPU allocation:
 
@@ -90,7 +90,7 @@ python scripts/train.py --config runs/config/train.json \
   --rl-root "$NEMO_RL_ROOT"
 ```
 
-`--check-only` validates configuration and runtime contracts; it does not prove GPU training correctness. Native checks in `tests/check_*` cover capture, masking, recovery, and learner integration with the required runtime installed.
+`--check-only` validates configuration and runtime contracts. Native checks in `tests/check_*` cover capture, masking, recovery, and learner integration with the required runtime installed.
 
 ## Reward
 
