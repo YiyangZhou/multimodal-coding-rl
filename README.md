@@ -1,6 +1,8 @@
 # Multimodal Coding RL
 
-Single-turn and agentic coding reinforcement learning built on [NeMo RL](https://github.com/NVIDIA-NeMo/RL) and [NeMo Gym](https://github.com/NVIDIA-NeMo/Gym).
+Single-turn and agentic coding reinforcement learning built on NeMo RL and an external Gym service.
+
+![Training architecture](docs/architecture.svg)
 
 ## Rollout modes
 
@@ -12,6 +14,22 @@ Single-turn and agentic coding reinforcement learning built on [NeMo RL](https:/
 | `sibling-mixed` | Generate eight answers per prompt: two direct, two OpenCode, two Codex, and two Hermes. |
 
 The same-prompt mixture keeps prompt identities and route assignments consistent through retries. Training uses complete prompt groups. Generation capacity and optimizer batch size are configured independently.
+
+## Rollout flows
+
+### Single-turn
+
+![Single-turn generation and verification](docs/single-turn.svg)
+
+### Multi-turn
+
+![Agentic rollout and training contract](docs/multi-turn.svg)
+
+### Mixed rollout
+
+![Prompt-group and same-prompt sibling routing](docs/mixed.svg)
+
+These diagrams describe the integration contracts, not a claim of public-stack GPU validation. See [runtime compatibility](docs/runtime-compatibility.md). Regenerate them with `python scripts/build_readme_diagrams.py`.
 
 ## Components
 

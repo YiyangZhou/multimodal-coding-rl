@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="550" viewBox="0 0 1440 550" role="img" aria-labelledby="title desc">
+<title id="title">Single-turn rollout</title><desc id="desc">One direct model answer; execution and scoring occur after generation.. Judge-only reference assets are not model inputs. A failed execution and an invalid infrastructure result are different outcomes.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#8996ab" stroke-width="1.3"/></marker></defs>
+<rect width="1440" height="550" rx="22" fill="#f6f8fc"/>
+<style>text{font-family:Arial,Helvetica,sans-serif} .title{font-size:30px;font-weight:700;fill:#18243a}.sub{font-size:17px;fill:#53627b}.heading{font-size:20px;font-weight:700;fill:#18243a}.body{font-size:17px;fill:#44536a}.label{font-size:15px;font-weight:700;letter-spacing:1px}</style>
+<text x="36" y="48" class="title">Single-turn rollout</text>
+<text x="36" y="80" class="sub">One direct model answer; execution and scoring occur after generation.</text>
+<text x="36" y="116" class="label" fill="#087f8c">01 / ANSWER</text>
+<rect x="36.0" y="132" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
+<rect x="36.0" y="144" width="4" height="28" rx="2" fill="#087f8c"/>
+<text x="54.0" y="163" class="heading">Prepare input</text>
+<text x="54.0" y="192" class="body">Task prompt + permitted references</text>
+<text x="54.0" y="215" class="body">Tokenizer and generation settings</text>
+<text x="54.0" y="238" class="body">Stable prompt-group identity</text>
+<path d="M475.6666666666667 198 H495.6666666666667" stroke="#8996ab" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="502.6666666666667" y="132" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
+<rect x="502.6666666666667" y="144" width="4" height="28" rx="2" fill="#087f8c"/>
+<text x="520.6666666666667" y="163" class="heading">Generate once</text>
+<text x="520.6666666666667" y="192" class="body">No agent harness or tool loop</text>
+<text x="520.6666666666667" y="215" class="body">Capture exact sampled tokens</text>
+<text x="520.6666666666667" y="238" class="body">Record behavior logprobs</text>
+<path d="M942.3333333333334 198 H962.3333333333334" stroke="#8996ab" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="969.3333333333334" y="132" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
+<rect x="969.3333333333334" y="144" width="4" height="28" rx="2" fill="#087f8c"/>
+<text x="987.3333333333334" y="163" class="heading">Extract final artifact</text>
+<text x="987.3333333333334" y="192" class="body">Task-specific answer extraction</text>
+<text x="987.3333333333334" y="215" class="body">Retain original answer and code</text>
+<text x="987.3333333333334" y="238" class="body">Record completion / truncation</text>
+<text x="36" y="301" class="label" fill="#3268bb">02 / EVALUATE</text>
+<rect x="36.0" y="317" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
+<rect x="36.0" y="329" width="4" height="28" rx="2" fill="#3268bb"/>
+<text x="54.0" y="348" class="heading">Execute and render</text>
+<text x="54.0" y="377" class="body">Fresh verification context</text>
+<text x="54.0" y="400" class="body">Compile or run the submitted code</text>
+<text x="54.0" y="423" class="body">Collect artifacts and diagnostics</text>
+<path d="M475.6666666666667 383 H495.6666666666667" stroke="#8996ab" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="502.6666666666667" y="317" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
+<rect x="502.6666666666667" y="329" width="4" height="28" rx="2" fill="#3268bb"/>
+<text x="520.6666666666667" y="348" class="heading">Score the result</text>
+<text x="520.6666666666667" y="377" class="body">Task-specific quality metrics</text>
+<text x="520.6666666666667" y="400" class="body">Model execution failure: zero</text>
+<text x="520.6666666666667" y="423" class="body">Infrastructure failure: excluded</text>
+<path d="M942.3333333333334 383 H962.3333333333334" stroke="#8996ab" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="969.3333333333334" y="317" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
+<rect x="969.3333333333334" y="329" width="4" height="28" rx="2" fill="#3268bb"/>
+<text x="987.3333333333334" y="348" class="heading">Train eligible groups</text>
+<text x="987.3333333333334" y="377" class="body">Apply configured masks / penalties</text>
+<text x="987.3333333333334" y="400" class="body">Retain complete sibling groups</text>
+<text x="987.3333333333334" y="423" class="body">Update the shared policy</text>
+<text x="36" y="525" class="sub">Judge-only reference assets are not model inputs. A failed execution and an invalid infrastructure result are different outcomes.</text>
+</svg>
