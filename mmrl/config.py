@@ -75,6 +75,7 @@ def gym_config(
     max_output_tokens=32768, context_window=65536, sandbox_memory_mib=16384,
     process_reward_config: ProcessRewardConfig | None = None,
     chartmimic_image: str | None = None,
+    project_harness_adapter: bool = False,
 ):
     managed_port = 5999 if gateway == "auto" else None
     gateway = (
@@ -234,7 +235,7 @@ def gym_config(
     for harness in HARNESS_NAMES:
         result[f"mm_{harness}"] = {
             "responses_api_agents": {
-                "harness_agent": {
+                ("mm_harness" if project_harness_adapter else "harness_agent"): {
                     "entrypoint": "app.py",
                     "agent": harness,
                     "resources_server": resource,

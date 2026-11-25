@@ -50,3 +50,17 @@ Do not apply the historical native layers on top of this composite profile. The 
 Add `--public-runtime` to `scripts/train.py` when using this checkout. This selects the composite source check for all rollout modes; external Gym checks still apply. Install the model dependencies and provide the compatible external Gym service before attempting launch.
 
 Clean installation, repeat installation, source verification, and rejection of modified sources have been tested. GPU training on this dependency stack remains unverified; this profile is experimental.
+
+### Project harness adapter
+
+The optional `--project-harness-adapter` flag selects `responses_api_agents/mm_harness`, a project-owned subclass of the external Gym harness agent. Use it consistently with `mmrl compose`, `scripts/bind_runtime.py`, and `scripts/train.py`. Keep the repository's `integrations/nemo_gym` directory on `NEMO_GYM_EXTRA_ROOTS` so Gym can discover the component.
+
+This adapter turns only an explicit upstream runner failure into a failed response. The coding resources server then returns a masked sample. Other exceptions keep their original behavior. It contains no Gym framework implementation.
+
+CPU response-model and resource-verifier checks passed against Gym commit `17abf2ddc76f74e40d0ba5a15b0401710a46db26`, the submodule pinned by the NeMo RL revision above, using Python 3.13.14. This is not full Gym or GPU acceptance. Trainer and server environments must still have matching Python minor and Ray versions; original-history capture still requires separately verified external support.
+
+```bash
+python tests/check_harness_failure_gym.py
+```
+
+Run this check in the external Gym environment with this project installed. It tests failed responses and masks without launching a sandbox or requesting model inference.

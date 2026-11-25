@@ -42,6 +42,7 @@ def main():
     )
     p.add_argument("--data", required=True)
     p.add_argument("--image", required=True)
+    p.add_argument("--project-harness-adapter", action="store_true", help="Use the project runner-failure adapter with external Gym")
     p.add_argument("--chartmimic-image", help="Digest-pinned Python 3.9 ChartMimic image")
     p.add_argument("--balanced-eleven", action="store_true",
                    help="Equal prompt exposure across all eleven benchmarks; single-turn data only")
@@ -138,6 +139,7 @@ def main():
             context_window=context_window,
             process_reward_config=process_config,
             chartmimic_image=args.chartmimic_image,
+            project_harness_adapter=args.project_harness_adapter,
         )
         root = Path(args.output).resolve()
         services = root / "gym.json"

@@ -17,6 +17,7 @@ from mmrl.history_config import original_history_root
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--config", required=True)
+    p.add_argument("--project-harness-adapter", action="store_true", help="Use the mm_harness component for agent rollouts")
     p.add_argument("--rl-root", required=True)
     p.add_argument("--check-only", action="store_true")
     p.add_argument("--public-runtime", action="store_true", help="Verify the experimental public-source composite runtime")
@@ -67,7 +68,8 @@ def main():
     for component in (
         "resources_servers/mm_coding",
         "responses_api_agents/simple_agent",
-        "responses_api_agents/harness_agent",
+        ("responses_api_agents/mm_harness" if args.project_harness_adapter
+         else "responses_api_agents/harness_agent"),
         "responses_api_models/vllm_model",
     ):
         venv = Path(gym["uv_venv_dir"]) / component / ".venv"
