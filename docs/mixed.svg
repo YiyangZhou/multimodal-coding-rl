@@ -1,51 +1,64 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="550" viewBox="0 0 1440 550" role="img" aria-labelledby="title desc">
-<title id="title">Mixed rollout</title><desc id="desc">Two routing strategies share task adapters, reward contracts and a single trainable policy.. Route support is task-specific. Ready-first scheduling selects complete groups; it does not select answers by reward.</desc>
-<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#8996ab" stroke-width="1.3"/></marker></defs>
-<rect width="1440" height="550" rx="22" fill="#f6f8fc"/>
-<style>text{font-family:Arial,Helvetica,sans-serif} .title{font-size:30px;font-weight:700;fill:#18243a}.sub{font-size:17px;fill:#53627b}.heading{font-size:20px;font-weight:700;fill:#18243a}.body{font-size:17px;fill:#44536a}.label{font-size:15px;font-weight:700;letter-spacing:1px}</style>
-<text x="36" y="48" class="title">Mixed rollout</text>
-<text x="36" y="80" class="sub">Two routing strategies share task adapters, reward contracts and a single trainable policy.</text>
-<text x="36" y="116" class="label" fill="#3268bb">A / PROMPT-GROUP ROUTING</text>
-<rect x="36.0" y="132" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
-<rect x="36.0" y="144" width="4" height="28" rx="2" fill="#3268bb"/>
-<text x="54.0" y="163" class="heading">Select a prompt group</text>
-<text x="54.0" y="192" class="body">Sample from the configured task mix</text>
-<text x="54.0" y="215" class="body">Choose one permitted route</text>
-<text x="54.0" y="238" class="body">Keep the route stable on retry</text>
-<path d="M475.6666666666667 198 H495.6666666666667" stroke="#8996ab" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="502.6666666666667" y="132" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
-<rect x="502.6666666666667" y="144" width="4" height="28" rx="2" fill="#3268bb"/>
-<text x="520.6666666666667" y="163" class="heading">Generate siblings</text>
-<text x="520.6666666666667" y="192" class="body">All siblings use the selected route</text>
-<text x="520.6666666666667" y="215" class="body">Direct or one supported harness</text>
-<text x="520.6666666666667" y="238" class="body">Preserve common prompt identity</text>
-<path d="M942.3333333333334 198 H962.3333333333334" stroke="#8996ab" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="969.3333333333334" y="132" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
-<rect x="969.3333333333334" y="144" width="4" height="28" rx="2" fill="#3268bb"/>
-<text x="987.3333333333334" y="163" class="heading">Complete the group</text>
-<text x="987.3333333333334" y="192" class="body">Verify each terminal artifact</text>
-<text x="987.3333333333334" y="215" class="body">Apply validity and length rules</text>
-<text x="987.3333333333334" y="238" class="body">Submit an eligible complete group</text>
-<text x="36" y="301" class="label" fill="#7357c7">B / SAME-PROMPT SIBLING ROUTING</text>
-<rect x="36.0" y="317" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
-<rect x="36.0" y="329" width="4" height="28" rx="2" fill="#7357c7"/>
-<text x="54.0" y="348" class="heading">One prompt, eight siblings</text>
-<text x="54.0" y="377" class="body">2 × single-turn</text>
-<text x="54.0" y="400" class="body">2 × OpenCode</text>
-<text x="54.0" y="423" class="body">2 × Codex + 2 × Hermes</text>
-<path d="M475.6666666666667 383 H495.6666666666667" stroke="#8996ab" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="502.6666666666667" y="317" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
-<rect x="502.6666666666667" y="329" width="4" height="28" rx="2" fill="#7357c7"/>
-<text x="520.6666666666667" y="348" class="heading">Execute all four routes</text>
-<text x="520.6666666666667" y="377" class="body">Stable sibling-to-route assignment</text>
-<text x="520.6666666666667" y="400" class="body">Each route uses its own tool flow</text>
-<text x="520.6666666666667" y="423" class="body">Same underlying trainable policy</text>
-<path d="M942.3333333333334 383 H962.3333333333334" stroke="#8996ab" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="969.3333333333334" y="317" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
-<rect x="969.3333333333334" y="329" width="4" height="28" rx="2" fill="#7357c7"/>
-<text x="987.3333333333334" y="348" class="heading">One grouped update stream</text>
-<text x="987.3333333333334" y="377" class="body">Common reward contract</text>
-<text x="987.3333333333334" y="400" class="body">Compare eligible sibling outcomes</text>
-<text x="987.3333333333334" y="423" class="body">Log task and route breakdowns</text>
-<text x="36" y="525" class="sub">Route support is task-specific. Ready-first scheduling selects complete groups; it does not select answers by reward.</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="690" viewBox="0 0 1440 690" role="img" aria-labelledby="title desc">
+<title id="title">03 / Mixed rollout</title><desc id="desc">Direct and agentic paths converge on one reward contract and one trainable policy.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#a3b2bb" stroke-width="1.5"/></marker></defs>
+<rect width="1440" height="690" rx="22" fill="#f7f8fa"/>
+<g font-family="Arial,Helvetica,sans-serif">
+<text x="40" y="45" font-size="25" fill="#1b2730" font-weight="600" text-anchor="start">03 / Mixed rollout</text>
+<text x="40" y="76" font-size="15" fill="#687882" font-weight="400" text-anchor="start">Direct and agentic paths converge on one reward contract and one trainable policy.</text>
+<path d="M230 352 H270" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M490 352 H530 V178 H580" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M530 294 H580" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M530 410 H580" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M530 526 H580" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M530 178 V526" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round"/>
+<path d="M830 178 H880" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round"/>
+<path d="M830 294 H880" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round"/>
+<path d="M830 410 H880" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round"/>
+<path d="M830 526 H880" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round"/>
+<path d="M880 178 V526" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round"/>
+<path d="M880 352 H940" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1160 352 H1210" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1305 404 V625 H555 V178 H580" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+<path d="M555 294 H580" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+<path d="M555 410 H580" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+<path d="M555 526 H580" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+<rect x="40" y="300" width="190" height="104" rx="14" fill="#ffffff" stroke="#dce3e9"/>
+<text x="58" y="327" font-size="11" fill="#687882" font-weight="600" text-anchor="start">INPUT</text>
+<text x="58" y="356" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Prompt group</text>
+<text x="58" y="381" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Stable prompt identity</text>
+<rect x="270" y="300" width="220" height="104" rx="14" fill="#ffffff" stroke="#dce3e9"/>
+<text x="288" y="327" font-size="11" fill="#687882" font-weight="600" text-anchor="start">ROUTING STRATEGY</text>
+<text x="288" y="356" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Assign before sampling</text>
+<text x="288" y="381" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Stable through retries</text>
+<rect x="580" y="126" width="250" height="104" rx="14" fill="#eaf6f7" stroke="#dce3e9"/>
+<text x="598" y="153" font-size="11" fill="#087f91" font-weight="600" text-anchor="start">DIRECT</text>
+<text x="598" y="182" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Single-turn</text>
+<text x="598" y="207" font-size="13" fill="#687882" font-weight="400" text-anchor="start">2 siblings / prompt</text>
+<rect x="580" y="242" width="250" height="104" rx="14" fill="#f0edfb" stroke="#dce3e9"/>
+<text x="598" y="269" font-size="11" fill="#7160bc" font-weight="600" text-anchor="start">AGENTIC</text>
+<text x="598" y="298" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">OpenCode</text>
+<text x="598" y="323" font-size="13" fill="#687882" font-weight="400" text-anchor="start">2 siblings / prompt</text>
+<rect x="580" y="358" width="250" height="104" rx="14" fill="#f0edfb" stroke="#dce3e9"/>
+<text x="598" y="385" font-size="11" fill="#7160bc" font-weight="600" text-anchor="start">AGENTIC</text>
+<text x="598" y="414" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Codex</text>
+<text x="598" y="439" font-size="13" fill="#687882" font-weight="400" text-anchor="start">2 siblings / prompt</text>
+<rect x="580" y="474" width="250" height="104" rx="14" fill="#f0edfb" stroke="#dce3e9"/>
+<text x="598" y="501" font-size="11" fill="#7160bc" font-weight="600" text-anchor="start">AGENTIC</text>
+<text x="598" y="530" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Hermes</text>
+<text x="598" y="555" font-size="13" fill="#687882" font-weight="400" text-anchor="start">2 siblings / prompt</text>
+<rect x="940" y="300" width="220" height="104" rx="14" fill="#ffffff" stroke="#dce3e9"/>
+<text x="958" y="327" font-size="11" fill="#687882" font-weight="600" text-anchor="start">SHARED CONTRACT</text>
+<text x="958" y="356" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Verify + reward</text>
+<text x="958" y="381" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Final artifacts + masks</text>
+<rect x="1210" y="300" width="190" height="104" rx="14" fill="#f0edfb" stroke="#dce3e9"/>
+<text x="1228" y="327" font-size="11" fill="#7160bc" font-weight="600" text-anchor="start">NEMO RL</text>
+<text x="1228" y="356" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Group + update</text>
+<text x="1228" y="381" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Shared policy</text>
+<text x="40" y="148" font-size="11" fill="#687882" font-weight="600" text-anchor="start">GROUP ROUTING</text>
+<text x="40" y="175" font-size="15" fill="#1b2730" font-weight="400" text-anchor="start">One route for all siblings</text>
+<text x="40" y="208" font-size="11" fill="#7160bc" font-weight="600" text-anchor="start">SIBLING MIX</text>
+<text x="40" y="235" font-size="15" fill="#1b2730" font-weight="400" text-anchor="start">Same prompt, four routes</text>
+<text x="40" y="260" font-size="14" fill="#687882" font-weight="400" text-anchor="start">8 siblings: 2 per route</text>
+<text x="945" y="614" font-size="13" fill="#7160bc" font-weight="400" text-anchor="start">Versioned policy sync to every route</text>
+<text x="40" y="668" font-size="13" fill="#687882" font-weight="400" text-anchor="start">The 2 + 2 + 2 + 2 allocation describes sibling-mixed mode. Group routing chooses one supported route per prompt group.</text>
+</g></svg>

@@ -1,51 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="550" viewBox="0 0 1440 550" role="img" aria-labelledby="title desc">
-<title id="title">Agentic rollout</title><desc id="desc">The selected harness controls the tool loop; the model remains the trainable policy.. Tool feedback belongs to the rollout context. Final verification supplies the reward; it does not rewrite the model answer.</desc>
-<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#8996ab" stroke-width="1.3"/></marker></defs>
-<rect width="1440" height="550" rx="22" fill="#f6f8fc"/>
-<style>text{font-family:Arial,Helvetica,sans-serif} .title{font-size:30px;font-weight:700;fill:#18243a}.sub{font-size:17px;fill:#53627b}.heading{font-size:20px;font-weight:700;fill:#18243a}.body{font-size:17px;fill:#44536a}.label{font-size:15px;font-weight:700;letter-spacing:1px}</style>
-<text x="36" y="48" class="title">Agentic rollout</text>
-<text x="36" y="80" class="sub">The selected harness controls the tool loop; the model remains the trainable policy.</text>
-<text x="36" y="116" class="label" fill="#7357c7">01 / INTERACTION LOOP</text>
-<rect x="36.0" y="132" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
-<rect x="36.0" y="144" width="4" height="28" rx="2" fill="#7357c7"/>
-<text x="54.0" y="163" class="heading">Choose a harness</text>
-<text x="54.0" y="192" class="body">OpenCode, Codex or Hermes</text>
-<text x="54.0" y="215" class="body">Task prompt + sandbox workspace</text>
-<text x="54.0" y="238" class="body">Configured call and token budgets</text>
-<path d="M475.6666666666667 198 H495.6666666666667" stroke="#8996ab" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="502.6666666666667" y="132" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
-<rect x="502.6666666666667" y="144" width="4" height="28" rx="2" fill="#7357c7"/>
-<text x="520.6666666666667" y="163" class="heading">Model ↔ tools</text>
-<text x="520.6666666666667" y="192" class="body">Model proposes code or actions</text>
-<text x="520.6666666666667" y="215" class="body">Harness executes permitted tools</text>
-<text x="520.6666666666667" y="238" class="body">Observations inform the next call</text>
-<path d="M942.3333333333334 198 H962.3333333333334" stroke="#8996ab" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="969.3333333333334" y="132" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
-<rect x="969.3333333333334" y="144" width="4" height="28" rx="2" fill="#7357c7"/>
-<text x="987.3333333333334" y="163" class="heading">Finalize the artifact</text>
-<text x="987.3333333333334" y="192" class="body">Stop on completion or budget</text>
-<text x="987.3333333333334" y="215" class="body">Keep code and interaction history</text>
-<text x="987.3333333333334" y="238" class="body">Record the terminal status</text>
-<text x="36" y="301" class="label" fill="#087f8c">02 / TRAINING CONTRACT</text>
-<rect x="36.0" y="317" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
-<rect x="36.0" y="329" width="4" height="28" rx="2" fill="#087f8c"/>
-<text x="54.0" y="348" class="heading">Capture each model call</text>
-<text x="54.0" y="377" class="body">Exact tokens + behavior logprobs</text>
-<text x="54.0" y="400" class="body">Preserve request / response lineage</text>
-<text x="54.0" y="423" class="body">Separate tool observations</text>
-<path d="M475.6666666666667 383 H495.6666666666667" stroke="#8996ab" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="502.6666666666667" y="317" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
-<rect x="502.6666666666667" y="329" width="4" height="28" rx="2" fill="#087f8c"/>
-<text x="520.6666666666667" y="348" class="heading">Verify final output</text>
-<text x="520.6666666666667" y="377" class="body">Independent task execution</text>
-<text x="520.6666666666667" y="400" class="body">Render and score final artifacts</text>
-<text x="520.6666666666667" y="423" class="body">Classify infrastructure failures</text>
-<path d="M942.3333333333334 383 H962.3333333333334" stroke="#8996ab" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="969.3333333333334" y="317" width="434.6666666666667" height="132" rx="12" fill="white" stroke="#dce3ee"/>
-<rect x="969.3333333333334" y="329" width="4" height="28" rx="2" fill="#087f8c"/>
-<text x="987.3333333333334" y="348" class="heading">Build policy samples</text>
-<text x="987.3333333333334" y="377" class="body">Train on eligible model tokens</text>
-<text x="987.3333333333334" y="400" class="body">Tool-output tokens are not targets</text>
-<text x="987.3333333333334" y="423" class="body">Group rewards feed advantages</text>
-<text x="36" y="525" class="sub">Tool feedback belongs to the rollout context. Final verification supplies the reward; it does not rewrite the model answer.</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="600" viewBox="0 0 1440 600" role="img" aria-labelledby="title desc">
+<title id="title">02 / Multi-turn</title><desc id="desc">The harness runs a bounded model–tool loop; the final artifact is scored independently.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#a3b2bb" stroke-width="1.5"/></marker></defs>
+<rect width="1440" height="600" rx="22" fill="#f7f8fa"/>
+<g font-family="Arial,Helvetica,sans-serif">
+<text x="40" y="45" font-size="25" fill="#1b2730" font-weight="600" text-anchor="start">02 / Multi-turn</text>
+<text x="40" y="76" font-size="15" fill="#687882" font-weight="400" text-anchor="start">The harness runs a bounded model–tool loop; the final artifact is scored independently.</text>
+<path d="M230 252 H280" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M500 252 H550" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M770 252 H820" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1050 252 H1100" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M660 200 V160 H390 V200" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M390 304 V426 H550" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1100 280 H1080 V478 H850 V426 H790" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+<path d="M1280 304 V538 H255 V252 H280" fill="none" stroke="#a3b2bb" stroke-width="1.7" stroke-linejoin="round" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+<rect x="40" y="200" width="190" height="104" rx="14" fill="#ffffff" stroke="#dce3e9"/>
+<text x="58" y="227" font-size="11" fill="#687882" font-weight="600" text-anchor="start">INPUT</text>
+<text x="58" y="256" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Task + assets</text>
+<text x="58" y="281" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Prompt / workspace</text>
+<rect x="280" y="200" width="220" height="104" rx="14" fill="#eaf6f7" stroke="#dce3e9"/>
+<text x="298" y="227" font-size="11" fill="#087f91" font-weight="600" text-anchor="start">SHARED POLICY</text>
+<text x="298" y="256" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Model call</text>
+<text x="298" y="281" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Captured sampled tokens</text>
+<rect x="550" y="200" width="220" height="104" rx="14" fill="#f0edfb" stroke="#dce3e9"/>
+<text x="568" y="227" font-size="11" fill="#7160bc" font-weight="600" text-anchor="start">HARNESS + SANDBOX</text>
+<text x="568" y="256" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Execute tools</text>
+<text x="568" y="281" font-size="13" fill="#687882" font-weight="400" text-anchor="start">OpenCode / Codex / Hermes</text>
+<rect x="820" y="200" width="230" height="104" rx="14" fill="#ffffff" stroke="#dce3e9"/>
+<text x="838" y="227" font-size="11" fill="#687882" font-weight="600" text-anchor="start">TERMINAL OUTPUT</text>
+<text x="838" y="256" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Final artifact</text>
+<text x="838" y="281" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Completion / budget stop</text>
+<rect x="1100" y="200" width="300" height="104" rx="14" fill="#ffffff" stroke="#dce3e9"/>
+<text x="1118" y="227" font-size="11" fill="#687882" font-weight="600" text-anchor="start">VERIFICATION + NEMO RL</text>
+<text x="1118" y="256" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Score → grouped update</text>
+<text x="1118" y="281" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Independent execution + reward</text>
+<rect x="550" y="374" width="240" height="104" rx="14" fill="#eaf6f7" stroke="#dce3e9"/>
+<text x="568" y="401" font-size="11" fill="#087f91" font-weight="600" text-anchor="start">CAPTURE GATEWAY</text>
+<text x="568" y="430" font-size="18" fill="#1b2730" font-weight="500" text-anchor="start">Training trajectory</text>
+<text x="568" y="455" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Logprobs · request lineage</text>
+<text x="472" y="149" font-size="13" fill="#7160bc" font-weight="400" text-anchor="start">Tool observations → next model call</text>
+<text x="820" y="466" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Reward + eligibility</text>
+<text x="810" y="527" font-size="13" fill="#7160bc" font-weight="400" text-anchor="start">Updated policy → next rollout</text>
+<text x="410" y="367" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Record every model call</text>
+<text x="40" y="578" font-size="13" fill="#687882" font-weight="400" text-anchor="start">Only eligible model tokens are learning targets. Tool-output tokens remain context, not policy targets.</text>
+</g></svg>

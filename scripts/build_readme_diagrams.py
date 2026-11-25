@@ -1,49 +1,104 @@
-"""Build the README's editable, dependency-free SVG architecture diagrams."""
+"""Render the README's native SVG flow diagrams (no dependencies)."""
 from pathlib import Path
 from html import escape
-
 OUT = Path(__file__).resolve().parents[1] / 'docs'
-COLORS = {'teal': '#087f8c', 'purple': '#7357c7', 'blue': '#3268bb', 'amber': '#ac7215'}
+INK, MUTED, LINE = '#1b2730', '#687882', '#a3b2bb'
+TEAL, PURPLE = '#087f91', '#7160bc'
 
-def diagram(name, title, subtitle, rows, footer):
-    height = 180 + len(rows) * 185
-    svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="{height}" viewBox="0 0 1440 {height}" role="img" aria-labelledby="title desc">',
-           f'<title id="title">{escape(title)}</title><desc id="desc">{escape(subtitle + ". " + footer)}</desc>',
-           '<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#8996ab" stroke-width="1.3"/></marker></defs>',
-           f'<rect width="1440" height="{height}" rx="22" fill="#f6f8fc"/>',
-           '<style>text{font-family:Arial,Helvetica,sans-serif} .title{font-size:30px;font-weight:700;fill:#18243a}.sub{font-size:17px;fill:#53627b}.heading{font-size:20px;font-weight:700;fill:#18243a}.body{font-size:17px;fill:#44536a}.label{font-size:15px;font-weight:700;letter-spacing:1px}</style>',
-           f'<text x="36" y="48" class="title">{escape(title)}</text>',
-           f'<text x="36" y="80" class="sub">{escape(subtitle)}</text>']
-    for r, (label, color, cards) in enumerate(rows):
-        y = 116 + r * 185
-        c = COLORS[color]
-        svg.append(f'<text x="36" y="{y}" class="label" fill="{c}">{escape(label.upper())}</text>')
-        width = (1368 - 32 * (len(cards)-1)) / len(cards)
-        for i, (heading, lines) in enumerate(cards):
-            x = 36 + i * (width + 32)
-            svg += [f'<rect x="{x}" y="{y+16}" width="{width}" height="132" rx="12" fill="white" stroke="#dce3ee"/>',
-                    f'<rect x="{x}" y="{y+28}" width="4" height="28" rx="2" fill="{c}"/>',
-                    f'<text x="{x+18}" y="{y+47}" class="heading">{escape(heading)}</text>']
-            for j, line in enumerate(lines):
-                svg.append(f'<text x="{x+18}" y="{y+76+j*23}" class="body">{escape(line)}</text>')
-            if i < len(cards)-1:
-                svg.append(f'<path d="M{x+width+5} {y+82} H{x+width+25}" stroke="#8996ab" stroke-width="2" marker-end="url(#arrow)"/>')
-    svg += [f'<text x="36" y="{height-25}" class="sub">{escape(footer)}</text>', '</svg>']
-    OUT.mkdir(exist_ok=True)
-    (OUT / f'{name}.svg').write_text('\n'.join(svg) + '\n')
+class Diagram:
+    def __init__(self, name, title, subtitle, height=560):
+        self.name, self.h = name, height
+        self.s = [f'<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="{height}" viewBox="0 0 1440 {height}" role="img" aria-labelledby="title desc">', f'<title id="title">{escape(title)}</title><desc id="desc">{escape(subtitle)}</desc>', '<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#a3b2bb" stroke-width="1.5"/></marker></defs>', f'<rect width="1440" height="{height}" rx="22" fill="#f7f8fa"/>', '<g font-family="Arial,Helvetica,sans-serif">']
+        self.text(40, 45, title, 25, INK, 600)
+        self.text(40, 76, subtitle, 15)
+    def text(self, x, y, value, size=14, color=MUTED, weight=400, anchor='start'):
+        self.s.append(f'<text x="{x}" y="{y}" font-size="{size}" fill="{color}" font-weight="{weight}" text-anchor="{anchor}">{escape(value)}</text>')
+    def path(self, d, dashed=False, arrow=True, color=LINE):
+        self.s.append(f'<path d="{d}" fill="none" stroke="{color}" stroke-width="1.7" stroke-linejoin="round"'+(' stroke-dasharray="5 5"' if dashed else '')+(' marker-end="url(#arrow)"' if arrow else '')+'/>')
+    def box(self, x,y,w,label,title,detail='',tone=None,h=104):
+        color = TEAL if tone=='teal' else PURPLE if tone=='purple' else MUTED
+        fill = '#eaf6f7' if tone=='teal' else '#f0edfb' if tone=='purple' else '#ffffff'
+        self.s.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="14" fill="{fill}" stroke="#dce3e9"/>')
+        self.text(x+18,y+27,label.upper(),11,color,600)
+        self.text(x+18,y+56,title,18,INK,500)
+        if detail:self.text(x+18,y+81,detail,13)
+    def note(self,t):self.text(40,self.h-22,t,13)
+    def save(self):
+        self.s.append('</g></svg>'); OUT.mkdir(exist_ok=True); (OUT/(self.name+'.svg')).write_text('\n'.join(self.s)+'\n')
 
-diagram('architecture', 'Multimodal Coding RL', 'Task adapters, rollout routes, verification and policy updates share one training pipeline.', [
-('01 / Generate', 'teal', [('Canonical task', ['Prompt + allowed input assets', 'Stable task and prompt IDs', 'Private judge references held back']), ('Route the prompt', ['Single-turn or agentic', 'OpenCode / Codex / Hermes', 'Group or sibling-level assignment']), ('Capture the rollout', ['Model tokens and behavior logprobs', 'Tool calls and terminal artifacts', 'Request lineage and stop reason'])]),
-('02 / Verify and learn', 'purple', [('Independent verification', ['Execute in the configured sandbox', 'Render images, animations or 3D', 'Apply the task-specific verifier']), ('Reward and eligibility', ['Raw reward + configured penalties', 'Separate model and service failures', 'Apply truncation / validity masks']), ('NeMo RL update', ['Assemble complete prompt groups', 'Compute advantages and policy loss', 'Checkpoint, metrics and recovery'])])], 'Configured generation capacity and optimizer batch size are independent. Public runtime compatibility is documented separately.')
+d=Diagram('architecture','One policy. Multiple ways to solve.','Multimodal tasks → direct or agentic rollouts → verified rewards → NeMo RL updates.',600)
+# Edges are laid out first, keeping the policy feedback separate from artifact flow.
+d.path('M240 252 H280 V162 H320');d.path('M280 252 V324 H320')
+d.path('M550 162 H590 V252 H650');d.path('M550 324 H590 V252',arrow=False)
+d.path('M880 252 H930');d.path('M1150 252 H1200')
+d.path('M435 376 V406');d.path('M320 450 H295 V350 H320')
+d.path('M1300 304 V532 H268 V124 H320',dashed=True)
+d.path('M268 324 H320',dashed=True)
+d.box(40,200,200,'Input adapters','Task + references','Images · text · code')
+d.box(320,110,230,'Single-turn','Direct generation','One model answer','teal')
+d.box(320,272,230,'Multi-turn','Agent harness','OpenCode · Codex · Hermes','purple')
+d.box(320,406,230,'Remote sandbox','Tools + observations','Execute · render · inspect')
+d.box(650,200,230,'Rollout contract','Trajectory capture','Tokens · logprobs · lineage','teal')
+d.box(930,200,220,'Task verifier','Execute + score','Final artifact → reward')
+d.box(1200,200,200,'NeMo RL','Grouped update','Advantages → policy','purple')
+d.text(760,342,'Complete prompt groups',14,TEAL,500)
+d.text(760,366,'Validity masks + length rules',13)
+d.text(735,521,'Versioned policy sync → generation workers',13,PURPLE)
+d.note('Private judge references stay outside model prompts. The Gym service and sandbox runtime are external dependencies.')
+d.save()
 
-diagram('single-turn', 'Single-turn rollout', 'One direct model answer; execution and scoring occur after generation.', [
-('01 / Answer', 'teal', [('Prepare input', ['Task prompt + permitted references', 'Tokenizer and generation settings', 'Stable prompt-group identity']), ('Generate once', ['No agent harness or tool loop', 'Capture exact sampled tokens', 'Record behavior logprobs']), ('Extract final artifact', ['Task-specific answer extraction', 'Retain original answer and code', 'Record completion / truncation'])]),
-('02 / Evaluate', 'blue', [('Execute and render', ['Fresh verification context', 'Compile or run the submitted code', 'Collect artifacts and diagnostics']), ('Score the result', ['Task-specific quality metrics', 'Model execution failure: zero', 'Infrastructure failure: excluded']), ('Train eligible groups', ['Apply configured masks / penalties', 'Retain complete sibling groups', 'Update the shared policy'])])], 'Judge-only reference assets are not model inputs. A failed execution and an invalid infrastructure result are different outcomes.')
+d=Diagram('single-turn','01 / Single-turn','A direct answer becomes an executable artifact; verification supplies the training reward.',500)
+for a,b in [(240,290),(500,550),(760,810),(1030,1080)]:d.path(f'M{a} 234 H{b}')
+d.path('M1240 286 V402 H395 V286',dashed=True)
+d.box(40,182,200,'Input','Task prompt','Allowed references')
+d.box(290,182,210,'Policy','Generate answer','Exact tokens + logprobs','teal')
+d.box(550,182,210,'Final artifact','Extract code','Preserve original output')
+d.box(810,182,220,'Verification','Execute + render','Task-specific scoring')
+d.box(1080,182,320,'NeMo RL','Reward → group → update','Model failures ≠ service failures','purple')
+d.text(870,157,'Sandbox / verifier',13)
+d.text(645,390,'Policy sync for subsequent rollouts',13,PURPLE)
+d.note('No harness tool loop. Truncation and infrastructure validity are checked before a sample contributes to training.')
+d.save()
 
-diagram('multi-turn', 'Agentic rollout', 'The selected harness controls the tool loop; the model remains the trainable policy.', [
-('01 / Interaction loop', 'purple', [('Choose a harness', ['OpenCode, Codex or Hermes', 'Task prompt + sandbox workspace', 'Configured call and token budgets']), ('Model ↔ tools', ['Model proposes code or actions', 'Harness executes permitted tools', 'Observations inform the next call']), ('Finalize the artifact', ['Stop on completion or budget', 'Keep code and interaction history', 'Record the terminal status'])]),
-('02 / Training contract', 'teal', [('Capture each model call', ['Exact tokens + behavior logprobs', 'Preserve request / response lineage', 'Separate tool observations']), ('Verify final output', ['Independent task execution', 'Render and score final artifacts', 'Classify infrastructure failures']), ('Build policy samples', ['Train on eligible model tokens', 'Tool-output tokens are not targets', 'Group rewards feed advantages'])])], 'Tool feedback belongs to the rollout context. Final verification supplies the reward; it does not rewrite the model answer.')
+d=Diagram('multi-turn','02 / Multi-turn','The harness runs a bounded model–tool loop; the final artifact is scored independently.',600)
+d.path('M230 252 H280');d.path('M500 252 H550');d.path('M770 252 H820');d.path('M1050 252 H1100')
+d.path('M660 200 V160 H390 V200')
+d.path('M390 304 V426 H550')
+d.path('M1100 280 H1080 V478 H850 V426 H790',dashed=True)
+d.path('M1280 304 V538 H255 V252 H280',dashed=True)
+d.box(40,200,190,'Input','Task + assets','Prompt / workspace')
+d.box(280,200,220,'Shared policy','Model call','Captured sampled tokens','teal')
+d.box(550,200,220,'Harness + sandbox','Execute tools','OpenCode / Codex / Hermes','purple')
+d.box(820,200,230,'Terminal output','Final artifact','Completion / budget stop')
+d.box(1100,200,300,'Verification + NeMo RL','Score → grouped update','Independent execution + reward')
+d.box(550,374,240,'Capture gateway','Training trajectory','Logprobs · request lineage','teal')
+d.text(472,149,'Tool observations → next model call',13,PURPLE)
+d.text(820,466,'Reward + eligibility',13)
+d.text(810,527,'Updated policy → next rollout',13,PURPLE)
+d.text(410,367,'Record every model call',13)
+d.note('Only eligible model tokens are learning targets. Tool-output tokens remain context, not policy targets.')
+d.save()
 
-diagram('mixed', 'Mixed rollout', 'Two routing strategies share task adapters, reward contracts and a single trainable policy.', [
-('A / Prompt-group routing', 'blue', [('Select a prompt group', ['Sample from the configured task mix', 'Choose one permitted route', 'Keep the route stable on retry']), ('Generate siblings', ['All siblings use the selected route', 'Direct or one supported harness', 'Preserve common prompt identity']), ('Complete the group', ['Verify each terminal artifact', 'Apply validity and length rules', 'Submit an eligible complete group'])]),
-('B / Same-prompt sibling routing', 'purple', [('One prompt, eight siblings', ['2 × single-turn', '2 × OpenCode', '2 × Codex + 2 × Hermes']), ('Execute all four routes', ['Stable sibling-to-route assignment', 'Each route uses its own tool flow', 'Same underlying trainable policy']), ('One grouped update stream', ['Common reward contract', 'Compare eligible sibling outcomes', 'Log task and route breakdowns'])])], 'Route support is task-specific. Ready-first scheduling selects complete groups; it does not select answers by reward.')
+d=Diagram('mixed','03 / Mixed rollout','Direct and agentic paths converge on one reward contract and one trainable policy.',690)
+# Four parallel lanes make same-prompt sibling allocation explicit.
+ys=[126,242,358,474]
+d.path('M230 352 H270');d.path('M490 352 H530 V178 H580')
+for y in ys[1:]:d.path(f'M530 {y+52} H580')
+d.path('M530 178 V526',arrow=False)
+for y in ys:d.path(f'M830 {y+52} H880',arrow=False)
+d.path('M880 178 V526',arrow=False);d.path('M880 352 H940');d.path('M1160 352 H1210')
+d.path('M1305 404 V625 H555 V178 H580',dashed=True)
+for y in ys[1:]:d.path(f'M555 {y+52} H580',dashed=True)
+d.box(40,300,190,'Input','Prompt group','Stable prompt identity')
+d.box(270,300,220,'Routing strategy','Assign before sampling','Stable through retries')
+for y,label,title,detail,tone in [(126,'Direct','Single-turn','2 siblings / prompt','teal'),(242,'Agentic','OpenCode','2 siblings / prompt','purple'),(358,'Agentic','Codex','2 siblings / prompt','purple'),(474,'Agentic','Hermes','2 siblings / prompt','purple')]:d.box(580,y,250,label,title,detail,tone)
+d.box(940,300,220,'Shared contract','Verify + reward','Final artifacts + masks')
+d.box(1210,300,190,'NeMo RL','Group + update','Shared policy','purple')
+d.text(40,148,'GROUP ROUTING',11,MUTED,600)
+d.text(40,175,'One route for all siblings',15,INK)
+d.text(40,208,'SIBLING MIX',11,PURPLE,600)
+d.text(40,235,'Same prompt, four routes',15,INK)
+d.text(40,260,'8 siblings: 2 per route',14)
+d.text(945,614,'Versioned policy sync to every route',13,PURPLE)
+d.note('The 2 + 2 + 2 + 2 allocation describes sibling-mixed mode. Group routing chooses one supported route per prompt group.')
+d.save()
